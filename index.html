@@ -293,9 +293,36 @@
                 document.body.removeChild(link);
             }, [processedData]);
 
+            // --- High-Res Image Download ---
+            const downloadChart = (ref, name) => {
+                if (!ref.current) return;
+                const timestamp = new Date().toISOString().slice(0,10);
+                // Scale 3 = 3x resolution (good for print/publication)
+                Plotly.downloadImage(ref.current, {
+                    format: 'png', 
+                    width: 1200, 
+                    height: 800, 
+                    scale: 3, 
+                    filename: `CASA_${name}_${timestamp}`
+                });
+            };
+
             // --- Charts Effect ---
             useEffect(() => {
                 if (!processedData.length) return;
+
+                // Common config for all plots: Enable modebar for user interaction, set default download to SVG for vector needs
+                const plotConfig = {
+                    responsive: true,
+                    displayModeBar: 'hover', // Enable hover tools
+                    toImageButtonOptions: {
+                        format: 'svg', // Default download button in modebar saves as SVG (Vector)
+                        filename: 'custom_image',
+                        height: 800,
+                        width: 1200,
+                        scale: 1 
+                    }
+                };
 
                 // --- Panel 1: Heatmap ---
                 // Sort by Group FIRST, then by Metric
@@ -385,7 +412,7 @@
                     margin: { t: 60, b: 40, l: 60, r: 20 }, // Increased Left margin for labels
                     showlegend: false,
                     title: `Flagellar Dynamics (Grouped by Genotype, Sorted by ${heatmapSortBy})`
-                }, { responsive: true, displayModeBar: false });
+                }, plotConfig);
 
                 // --- Panel 2: Scatter (VCL vs BCF) ---
                 let tracesScatter = [];
@@ -465,7 +492,7 @@
                         yref: 'y', y0: bcfThreshold, y1: bcfThreshold,
                         line: { color: 'gray', width: 2, dash: 'dash' }
                     }] : []
-                }, { responsive: true, displayModeBar: 'hover' });
+                }, plotConfig);
 
                 // --- Panel 3: Box Plots ---
                 const boxMetrics = ["VCL", "ALH", "BCF", "VSL"];
@@ -506,7 +533,7 @@
                     yaxis3: { title: METRICS_INFO.BCF.unit },
                     yaxis4: { title: METRICS_INFO.VSL.unit },
                     layout: { showlegend: true }
-                }, { responsive: true, displayModeBar: false });
+                }, plotConfig);
 
             }, [processedData, heatmapSortBy, visibleGroups, showDensity, colorByThreshold, bcfThreshold]);
 
@@ -538,6 +565,27 @@
                                 <div><label className="text-xs text-slate-400">Encoding</label><select value={encoding} onChange={e => setEncoding(e.target.value)} className="ml-2 text-xs border rounded p-1 bg-slate-50 text-slate-600"><option value="Shift-JIS">Shift-JIS</option><option value="UTF-8">UTF-8</option></select></div>
                             </div>
                         </div>
+                        <hr className="border-slate-100"/>
+                        
+                        {/* NEW: Export Figures Section */}
+                        <div className="space-y-4">
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Export Figures (HD)</h3>
+                            <div className="grid grid-cols-1 gap-2">
+                                <button onClick={() => downloadChart(heatmapRef, 'Heatmap')} className="flex items-center justify-between w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-medium text-slate-600 hover:bg-slate-50 transition">
+                                    <span>Heatmap .png</span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                                </button>
+                                <button onClick={() => downloadChart(scatterRef, 'Scatter')} className="flex items-center justify-between w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-medium text-slate-600 hover:bg-slate-50 transition">
+                                    <span>Scatter .png</span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                                </button>
+                                <button onClick={() => downloadChart(boxRef, 'BoxPlots')} className="flex items-center justify-between w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-medium text-slate-600 hover:bg-slate-50 transition">
+                                    <span>BoxPlots .png</span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                                </button>
+                            </div>
+                        </div>
+
                         <hr className="border-slate-100"/>
                         <div className="space-y-5">
                             <h3 className="text-xs font-bold text-indigo-500 uppercase tracking-wider">Scatter Plot Settings</h3>
