@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CASA Sperm Motility Dashboard</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    
+    <!-- PapaParse for CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <!-- Lucide Icons (Optional, used internally via SVG) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- jStat for p-value calculation -->
+    <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f8fafc; }
+        .panel-card { background: white; border-radius: 0.75rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }
+        .sidebar { width: 320px; flex-shrink: 0; background: white; border-right: 1px solid #e2e8f0; height: 100vh; position: sticky; top: 0; overflow-y: auto; }
+        .main-content { flex: 1; padding: 1.5rem; overflow-y: auto; height: 100vh; }
+        /* Plotly scroll adjustments */
+        .js-plotly-plot .plotly .modebar { left: 50% !important; transform: translateX(-50%); }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #4f46e5; margin-top: -6px; cursor: pointer; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #e2e8f0; border-radius: 2px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+        // --- 1. Constants & Config ---
+        
+        const COL_MAP = {
+            VALIDITY: ["有効性", "Validity"],
+            VCL: ["曲線速度[μm/秒]", "VCL"],
+            VSL: ["直線速度[μm/秒]", "VSL"],
+            VAP: ["VAP", "平均速度[μm/秒]"], 
+            ALH: ["頭部振幅[μm]", "ALH"],
+            BCF: ["頭部振動数[Hz]", "BCF"],
+            LIN: ["LIN"], 
+            STR: ["STR"], 
+            POINTS: ["座標数", "Points"]
+        };
+
+        const METRICS_INFO = {
+            VCL: { label: "VCL", unit: "μm/s", name: "Curvilinear Velocity" },
+            VSL: { label: "VSL", unit: "μm/s", name: "Straight Line Velocity" },
+            VAP: { label: "VAP", unit: "μm/s", name: "Average Path Velocity" },
+            ALH: { label: "ALH", unit: "μm", name: "Lateral Head Displacement" },
+            BCF: { label: "BCF", unit: "Hz", name: "Beat Cross Frequency" },
+            LIN: { label: "LIN", unit: "%", name: "Linearity" },
+            STR: { label: "STR", unit: "%", name: "Straightness" },
+            POINTS: { label: "Points", unit: "", name: "Track Points" }
+        };
+
+        const GROUPS = {
+            WT: { color: '#2563eb', label: 'WT' }, // Blue-600 (Matches scatter/box)
+            KO: { color: '#dc2626', label: 'KO' }  // Red-600  (Matches scatter/box)
+        };
+
+        // --- 2. Helper Functions ---
+
+        const getVal = (row, keys) => {
+            for (let k of keys) {
+                if (row[k] !== undefined) return row[k];
+            }
+            return null;
+        };
+
+        const calculateStats = (values) => {
+            if (!values.length) return { mean: 0, std: 0, n: 0, median: 0, iqr: 0 };
+            const n = values.length;
+            const sum = values.reduce((a, b) => a + b, 0);
+            const mean = sum / n;
+            const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n - 1 || 1);
+            const std = Math.sqrt(variance);
+            const sorted = [...values].sort((a, b) => a - b);
+            const median = n % 2 === 0 ? (sorted[n/2 - 1] + sorted[n/2]) / 2 : sorted[(n-1)/2];
+            const q1 = sorted[Math.floor((n-1)/4)];
+            const q3 = sorted[Math.floor((n-1)*3/4)];
+            return { mean, std, n, median, iqr: q3 - q1 };
+        };
+
+        const calculatePValue = (arr1, arr2) => {
+            if (arr1.length < 2 || arr2.length < 2) return NaN;
+            try {
+                const s1 = calculateStats(arr1);
+                const s2 = calculateStats(arr2);
+                
+                if (s1.std === 0 && s2.std === 0) return NaN;
+
+                const vn1 = s1.std ** 2 / s1.n;
+                const vn2 = s2.std ** 2 / s2.n;
+                
+                if (vn1 + vn2 === 0) return NaN;
+
+                const t = (s1.mean - s2.mean) / Math.sqrt(vn1 + vn2);
+                const df = ((vn1 + vn2)**2) / ((vn1**2)/(s1.n-1) + (vn2**2)/(s2.n-1));
+                const p = jStat.studentt.cdf(-Math.abs(t), df) * 2;
+                return p;
+            } catch (e) {
+                console.error("Stats error", e);
+                return NaN;
+            }
+        };
+
+        const formatPValue = (p) => {
+            if (isNaN(p)) return "ns";
+            if (p < 0.0001) return "p < 0.0001 ****";
+            if (p < 0.001) return "p < 0.001 ***";
+            if (p < 0.01) return "p < 0.01 **";
+            if (p < 0.05) return "p < 0.05 *";
+            return `ns (p=${p.toFixed(2)})`;
+        };
+
+        // Demo Data Generator
+        const generateDemoData = () => {
+            const generateGroup = (group, count, vclMean, bcfMean, alhMean) => {
+                return Array.from({ length: count }).map((_, i) => ({
+                    Group: group,
+                    Validity: 1, 
+                    Points: Math.floor(Math.random() * 50) + 50, 
+                    VCL: Math.max(15, jStat.normal.sample(vclMean, 20)),
+                    VSL: Math.max(10, jStat.normal.sample(vclMean * 0.4, 10)),
+                    VAP: Math.max(12, jStat.normal.sample(vclMean * 0.7, 15)),
+                    ALH: Math.max(1, jStat.normal.sample(alhMean, 1.5)),
+                    BCF: Math.max(5, jStat.normal.sample(bcfMean, 5)),
+                    LIN: Math.min(100, Math.max(0, jStat.normal.sample(40, 10))),
+                    STR: Math.min(100, Math.max(0, jStat.normal.sample(60, 10))),
+                    _id: `${group}_${i}`
+                }));
+            };
+            const wt = generateGroup("WT", 150, 90, 25, 6); 
+            const ko = generateGroup("KO", 120, 70, 12, 7.5);
+            return [...wt, ...ko];
+        };
+
+        // --- 3. Components ---
+
+        const Dashboard = () => {
+            const [cleanedData, setCleanedData] = useState([]); 
+            const [encoding, setEncoding] = useState("Shift-JIS");
+            
+            // View Controls
+            const [visibleGroups, setVisibleGroups] = useState({ WT: true, KO: true });
+            const [heatmapSortBy, setHeatmapSortBy] = useState("BCF"); 
+            const [showDensity, setShowDensity] = useState(false);
+            
+            // Scatter Plot Special Controls
+            const [colorByThreshold, setColorByThreshold] = useState(false);
+            const [bcfThreshold, setBcfThreshold] = useState(20);
+            
+            // Filters
+            const [filters, setFilters] = useState({ 
+                VCL: 10, 
+                BCF: 0, 
+                VSL: 5, 
+                ALH: 0 
+            }); 
+
+            // Refs
+            const heatmapRef = useRef(null);
+            const scatterRef = useRef(null);
+            const boxRef = useRef(null);
+
+            // --- Data Ingestion ---
+            const processParsedData = (results, groupLabel, fileName) => {
+                return results.data.map((row, idx) => {
+                    const item = { Group: groupLabel, _filename: fileName, _id: `${groupLabel}_${fileName}_${idx}` };
+                    
+                    let hasError = false;
+                    Object.keys(COL_MAP).forEach(key => {
+                        const val = getVal(row, COL_MAP[key]);
+                        if (key !== 'VALIDITY' && val !== null && !isNaN(parseFloat(val))) {
+                            item[key] = parseFloat(val);
+                        } else if (val !== null) {
+                            item[key] = val;
+                        }
+                    });
+
+                    if (item.VALIDITY === undefined) item.VALIDITY = 1; 
+
+                    return item;
+                }).filter(item => {
+                    if (item.VALIDITY != 1) return false;
+                    if (!item.VCL || item.VCL <= 10) return false;
+                    if (!item.VSL || item.VSL <= 5) return false;
+                    if (!item.POINTS || item.POINTS < 50) return false;
+                    return true;
+                });
+            };
+
+            const handleFileUpload = async (e, group) => {
+                const newFiles = Array.from(e.target.files);
+                const parsedDataChunks = await Promise.all(newFiles.map(file => new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        Papa.parse(evt.target.result, {
+                            header: true,
+                            dynamicTyping: true,
+                            skipEmptyLines: true,
+                            complete: (res) => {
+                                resolve(processParsedData(res, group, file.name));
+                            }
+                        });
+                    };
+                    reader.readAsText(file, encoding);
+                })));
+                setCleanedData(prev => [...prev, ...parsedDataChunks.flat()]);
+            };
+
+            const loadDemoData = () => {
+                const demo = generateDemoData();
+                setCleanedData(demo);
+            };
+
+            // --- Visualization Data ---
+            const processedData = useMemo(() => {
+                if (!cleanedData.length) return [];
+                
+                let filtered = cleanedData.filter(d => 
+                    d.VCL >= filters.VCL && 
+                    d.BCF >= filters.BCF &&
+                    d.VSL >= filters.VSL &&
+                    d.ALH >= filters.ALH &&
+                    visibleGroups[d.Group]
+                );
+
+                const metrics = ["VCL", "ALH", "BCF"];
+                const stats = {};
+                metrics.forEach(m => {
+                    const values = filtered.map(d => d[m]);
+                    stats[m] = calculateStats(values);
+                });
+
+                return filtered.map(d => {
+                    const zScores = {};
+                    metrics.forEach(m => {
+                        zScores[m] = stats[m].std ? (d[m] - stats[m].mean) / stats[m].std : 0;
+                    });
+                    return { ...d, zScores };
+                });
+            }, [cleanedData, visibleGroups, filters]);
+
+            const summaryStats = useMemo(() => {
+                if (!processedData.length) return null;
+                const metrics = ["VCL", "ALH", "BCF", "VSL", "LIN", "STR"];
+                const res = {};
+                metrics.forEach(m => {
+                    const wtVals = processedData.filter(d => d.Group === "WT").map(d => d[m]);
+                    const koVals = processedData.filter(d => d.Group === "KO").map(d => d[m]);
+                    res[m] = {
+                        WT: calculateStats(wtVals),
+                        KO: calculateStats(koVals),
+                        p: calculatePValue(wtVals, koVals)
+                    };
+                });
+                return res;
+            }, [processedData]);
+
+            // --- Export ---
+            const exportCSV = useCallback(() => {
+                if (!processedData.length) return;
+                const headers = ["Group", "VCL", "VSL", "VAP", "ALH", "BCF", "LIN", "STR", "Points"];
+                const rows = processedData.map(d => [
+                    d.Group, d.VCL, d.VSL, d.VAP, d.ALH, d.BCF, d.LIN, d.STR, d.POINTS
+                ]);
+                const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+                link.href = url;
+                link.setAttribute("download", `Filtered_Sperm_Tracks_${timestamp}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }, [processedData]);
+
+            // --- Charts Effect ---
+            useEffect(() => {
+                if (!processedData.length) return;
+
+                // --- Panel 1: Heatmap ---
+                // Sort by Group FIRST, then by Metric
+                const sortedData = [...processedData].sort((a, b) => {
+                    if (a.Group !== b.Group) return a.Group === "WT" ? -1 : 1;
+                    return a[heatmapSortBy] - b[heatmapSortBy];
+                });
+
+                // --- Calculate Split Points for Group Labels ---
+                const wtCount = sortedData.filter(d => d.Group === "WT").length;
+                const koCount = sortedData.filter(d => d.Group === "KO").length;
+                const totalCount = sortedData.length;
+
+                // Tick Positions (Center of each block)
+                const wtCenter = wtCount / 2;
+                const koCenter = wtCount + (koCount / 2);
+
+                const heatmapZ = sortedData.map(d => [d.zScores.VCL, d.zScores.ALH, d.zScores.BCF]);
+                const heatmapText = sortedData.map(d => [
+                    `VCL: ${d.VCL.toFixed(1)} ${METRICS_INFO.VCL.unit}<br>Group: ${d.Group}`, 
+                    `ALH: ${d.ALH.toFixed(1)} ${METRICS_INFO.ALH.unit}<br>Group: ${d.Group}`, 
+                    `BCF: ${d.BCF.toFixed(1)} ${METRICS_INFO.BCF.unit}<br>Group: ${d.Group}`
+                ]);
+                
+                const groupCol = sortedData.map(d => d.Group === "WT" ? 0 : 1);
+
+                Plotly.newPlot(heatmapRef.current, [
+                    {
+                        z: heatmapZ,
+                        x: ["VCL", "ALH", "BCF"],
+                        type: 'heatmap',
+                        colorscale: [
+                            [0, 'rgb(37, 99, 235)'],   // Blue
+                            [0.5, 'rgb(255, 255, 255)'], // White
+                            [1, 'rgb(220, 38, 38)']    // Red
+                        ],
+                        reversescale: false, 
+                        zmin: -3, zmax: 3,
+                        colorbar: { title: 'Z-Score', len: 0.9, x: 1.02 },
+                        hoverinfo: 'text',
+                        text: heatmapText,
+                        xaxis: 'x2', yaxis: 'y'
+                    },
+                    {
+                        z: [groupCol], 
+                        transpose: true, 
+                        type: 'heatmap',
+                        colorscale: [
+                            [0, '#2563eb'], // WT (Blue)
+                            [1, '#dc2626']  // KO (Red)
+                        ],
+                        showscale: false,
+                        hoverinfo: 'text',
+                        text: [sortedData.map(d => `Group: ${d.Group}`)],
+                        xaxis: 'x', yaxis: 'y'
+                    }
+                ], {
+                    grid: { rows: 1, columns: 2, pattern: 'independent' },
+                    xaxis: { domain: [0, 0.05], showticklabels: false, title: "" },
+                    xaxis2: { domain: [0.07, 1], side: 'top' },
+                    
+                    // --- ENHANCED Y-AXIS LABELS ---
+                    yaxis: { 
+                        showticklabels: true, // Enable labels
+                        tickmode: 'array',
+                        tickvals: [wtCenter, koCenter], // Position at center of each group
+                        ticktext: [`<b>WT</b><br><span style="font-size:10px">n=${wtCount}</span>`, `<b>KO</b><br><span style="font-size:10px">n=${koCount}</span>`], // Large Bold Text
+                        autorange: 'reversed', 
+                        title: "",
+                        tickfont: { size: 14, color: '#334155' } 
+                    },
+                    
+                    // --- SEPARATION LINE ---
+                    shapes: [
+                        {
+                            type: 'line',
+                            xref: 'paper', x0: 0, x1: 1, // Full width across both subplots
+                            yref: 'y', y0: wtCount, y1: wtCount, // At the boundary
+                            line: {
+                                color: 'black',
+                                width: 2,
+                                dash: 'dash' // Dashed line to separate groups
+                            }
+                        }
+                    ],
+
+                    margin: { t: 60, b: 40, l: 60, r: 20 }, // Increased Left margin for labels
+                    showlegend: false,
+                    title: `Flagellar Dynamics (Grouped by Genotype, Sorted by ${heatmapSortBy})`
+                }, { responsive: true, displayModeBar: false });
+
+                // --- Panel 2: Scatter (VCL vs BCF) ---
+                let tracesScatter = [];
+                ["WT", "KO"].filter(g => visibleGroups[g]).forEach(g => {
+                    const groupData = processedData.filter(d => d.Group === g);
+
+                    if (colorByThreshold) {
+                        const high = groupData.filter(d => d.BCF >= bcfThreshold);
+                        if (high.length > 0) {
+                            tracesScatter.push({
+                                x: high.map(d => d.VCL),
+                                y: high.map(d => d.BCF),
+                                mode: 'markers',
+                                type: 'scatter',
+                                name: `${g} (≥${bcfThreshold}Hz)`,
+                                marker: { color: GROUPS[g].color, opacity: 0.8, size: 7 }, 
+                                text: high.map(d => `ALH: ${d.ALH.toFixed(2)} ${METRICS_INFO.ALH.unit}<br>Group: ${d.Group}`),
+                                hovertemplate: '<b>%{y:.1f} Hz</b> / %{x:.1f} μm/s<br>%{text}<extra></extra>'
+                            });
+                        }
+                        const low = groupData.filter(d => d.BCF < bcfThreshold);
+                        if (low.length > 0) {
+                            tracesScatter.push({
+                                x: low.map(d => d.VCL),
+                                y: low.map(d => d.BCF),
+                                mode: 'markers',
+                                type: 'scatter',
+                                name: `${g} (<${bcfThreshold}Hz)`,
+                                marker: { color: '#94a3b8', opacity: 0.4, size: 5 }, 
+                                text: low.map(d => `ALH: ${d.ALH.toFixed(2)} ${METRICS_INFO.ALH.unit}<br>Group: ${d.Group}`),
+                                hovertemplate: '<b>%{y:.1f} Hz</b> / %{x:.1f} μm/s<br>%{text}<extra>Low Freq</extra>'
+                            });
+                        }
+                    } else {
+                        tracesScatter.push({
+                            x: groupData.map(d => d.VCL),
+                            y: groupData.map(d => d.BCF),
+                            mode: 'markers',
+                            type: 'scatter',
+                            name: g,
+                            marker: { color: GROUPS[g].color, opacity: 0.6, size: 6 },
+                            text: groupData.map(d => `ALH: ${d.ALH.toFixed(2)} ${METRICS_INFO.ALH.unit}<br>VSL: ${d.VSL?.toFixed(2)} ${METRICS_INFO.VSL.unit}<br>Group: ${d.Group}`),
+                            hovertemplate: '<b>%{y:.1f} Hz</b> / %{x:.1f} μm/s<br>%{text}<extra></extra>'
+                        });
+                    }
+                });
+
+                if (showDensity) {
+                    ["WT", "KO"].filter(g => visibleGroups[g]).forEach(g => {
+                        const groupData = processedData.filter(d => d.Group === g);
+                        tracesScatter.push({
+                            x: groupData.map(d => d.VCL),
+                            y: groupData.map(d => d.BCF),
+                            type: 'histogram2dcontour',
+                            colorscale: g === 'WT' ? 'Blues' : 'Reds',
+                            showscale: false,
+                            ncontours: 10,
+                            line: { width: 1 },
+                            opacity: 0.3,
+                            hoverinfo: 'skip'
+                        });
+                    });
+                }
+
+                Plotly.newPlot(scatterRef.current, tracesScatter, {
+                    title: colorByThreshold ? `VCL vs BCF (Threshold: ${bcfThreshold} Hz)` : 'VCL vs BCF Correlation by Group',
+                    xaxis: { title: `Curvilinear Velocity (VCL) [${METRICS_INFO.VCL.unit}]`, gridcolor: '#f0f0f0' },
+                    yaxis: { title: `Beat Cross Frequency (BCF) [${METRICS_INFO.BCF.unit}]`, gridcolor: '#f0f0f0' },
+                    margin: { t: 60, b: 50, l: 60, r: 20 },
+                    legend: { x: 0, y: 1 },
+                    hovermode: 'closest',
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    shapes: colorByThreshold ? [{
+                        type: 'line',
+                        xref: 'paper', x0: 0, x1: 1,
+                        yref: 'y', y0: bcfThreshold, y1: bcfThreshold,
+                        line: { color: 'gray', width: 2, dash: 'dash' }
+                    }] : []
+                }, { responsive: true, displayModeBar: 'hover' });
+
+                // --- Panel 3: Box Plots ---
+                const boxMetrics = ["VCL", "ALH", "BCF", "VSL"];
+                const boxTraces = [];
+                
+                boxMetrics.forEach((m, i) => {
+                    ["WT", "KO"].filter(g => visibleGroups[g]).forEach(g => {
+                        const vals = processedData.filter(d => d.Group === g).map(d => d[m]);
+                        const stats = calculateStats(vals);
+                        boxTraces.push({
+                            y: vals,
+                            type: 'violin',
+                            name: g,
+                            legendgroup: g,
+                            showlegend: i === 0, 
+                            box: { visible: true },
+                            points: false, 
+                            meanline: { visible: true },
+                            line: { color: GROUPS[g].color },
+                            xaxis: `x${i + 1}`,
+                            yaxis: `y${i + 1}`,
+                            hoverinfo: 'y+name+text',
+                            text: `Median: ${stats.median.toFixed(2)}<br>IQR: ${stats.iqr.toFixed(2)}`
+                        });
+                    });
+                });
+
+                Plotly.newPlot(boxRef.current, boxTraces, {
+                    grid: { rows: 1, columns: 4, pattern: 'independent' },
+                    title: 'Group Distribution: VCL, ALH, BCF, VSL',
+                    margin: { t: 60, b: 60, l: 50, r: 20 },
+                    xaxis: { title: "VCL", showticklabels: false },
+                    xaxis2: { title: "ALH", showticklabels: false },
+                    xaxis3: { title: "BCF", showticklabels: false },
+                    xaxis4: { title: "VSL", showticklabels: false },
+                    yaxis: { title: METRICS_INFO.VCL.unit },
+                    yaxis2: { title: METRICS_INFO.ALH.unit },
+                    yaxis3: { title: METRICS_INFO.BCF.unit },
+                    yaxis4: { title: METRICS_INFO.VSL.unit },
+                    layout: { showlegend: true }
+                }, { responsive: true, displayModeBar: false });
+
+            }, [processedData, heatmapSortBy, visibleGroups, showDensity, colorByThreshold, bcfThreshold]);
+
+            return (
+                <div className="flex flex-col md:flex-row min-h-screen">
+                    <aside className="sidebar p-6 flex flex-col gap-6">
+                        <div>
+                            <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                <span className="text-indigo-600">CASA</span> Analytics
+                            </h1>
+                            <p className="text-xs text-slate-500 mt-1">Sperm Flagellar Dynamics Dashboard</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Data Ingestion</h3>
+                            {!cleanedData.length ? (
+                                <button onClick={loadDemoData} className="w-full py-2 px-4 bg-indigo-50 text-indigo-600 rounded-md text-sm font-medium hover:bg-indigo-100 transition border border-indigo-200">Load Demo Dataset</button>
+                            ) : (
+                                <div className="space-y-2">
+                                    <div className="text-xs text-green-600 font-medium bg-green-50 p-2 rounded border border-green-200 flex justify-between">
+                                        <span>✓ Raw Loaded</span><span>{cleanedData.length} tracks</span>
+                                    </div>
+                                    <button onClick={exportCSV} className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-slate-800 text-white rounded-md text-xs font-medium hover:bg-slate-900 transition"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>Export CSV</button>
+                                </div>
+                            )}
+                            <div className="grid gap-3">
+                                <div className="space-y-1"><label className="block text-xs font-medium text-slate-600">WT Files</label><input type="file" multiple accept=".csv" onChange={e => handleFileUpload(e, "WT")} className="block w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/></div>
+                                <div className="space-y-1"><label className="block text-xs font-medium text-slate-600">KO Files</label><input type="file" multiple accept=".csv" onChange={e => handleFileUpload(e, "KO")} className="block w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100"/></div>
+                                <div><label className="text-xs text-slate-400">Encoding</label><select value={encoding} onChange={e => setEncoding(e.target.value)} className="ml-2 text-xs border rounded p-1 bg-slate-50 text-slate-600"><option value="Shift-JIS">Shift-JIS</option><option value="UTF-8">UTF-8</option></select></div>
+                            </div>
+                        </div>
+                        <hr className="border-slate-100"/>
+                        <div className="space-y-5">
+                            <h3 className="text-xs font-bold text-indigo-500 uppercase tracking-wider">Scatter Plot Settings</h3>
+                            <div className="space-y-3 bg-indigo-50 p-3 rounded-md border border-indigo-100">
+                                <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={colorByThreshold} onChange={e => setColorByThreshold(e.target.checked)} className="rounded text-indigo-600"/><span className="text-xs font-bold text-slate-700">Threshold Coloring Mode</span></label>
+                                {colorByThreshold && (<div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-300"><div className="flex justify-between"><label className="text-xs font-medium text-slate-600">BCF Threshold</label><span className="text-xs font-mono text-slate-500">{bcfThreshold} Hz</span></div><input type="range" min="0" max="40" step="1" value={bcfThreshold} onChange={e => setBcfThreshold(Number(e.target.value))} className="w-full accent-indigo-600"/><div className="flex justify-between text-[10px] text-slate-400 pt-1"><span>Blue (Low)</span><span>Red (High)</span></div></div>)}
+                            </div>
+                        </div>
+                        <hr className="border-slate-100"/>
+                        <div className="space-y-5">
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Data Filters</h3>
+                            <div className="space-y-4">
+                                <div className="space-y-1"><div className="flex justify-between"><label className="text-xs font-medium text-slate-600">Min VCL</label><span className="text-xs font-mono text-slate-500">{filters.VCL} μm/s</span></div><input type="range" min="0" max="200" step="5" value={filters.VCL} onChange={e => setFilters(p => ({...p, VCL: Number(e.target.value)}))} className="w-full"/></div>
+                                <div className="space-y-1"><div className="flex justify-between"><label className="text-xs font-medium text-slate-600">Min BCF</label><span className="text-xs font-mono text-slate-500">{filters.BCF} Hz</span></div><input type="range" min="0" max="30" step="1" value={filters.BCF} onChange={e => setFilters(p => ({...p, BCF: Number(e.target.value)}))} className="w-full"/></div>
+                                <div className="space-y-1"><div className="flex justify-between"><label className="text-xs font-medium text-slate-600">Min VSL</label><span className="text-xs font-mono text-slate-500">{filters.VSL} μm/s</span></div><input type="range" min="0" max="80" step="2" value={filters.VSL} onChange={e => setFilters(p => ({...p, VSL: Number(e.target.value)}))} className="w-full"/></div>
+                                <div className="space-y-1"><div className="flex justify-between"><label className="text-xs font-medium text-slate-600">Min ALH</label><span className="text-xs font-mono text-slate-500">{filters.ALH} μm</span></div><input type="range" min="0" max="10" step="0.5" value={filters.ALH} onChange={e => setFilters(p => ({...p, ALH: Number(e.target.value)}))} className="w-full"/></div>
+                            </div>
+                            <div className="space-y-2 pt-2 border-t border-slate-100">
+                                <label className="block text-xs text-slate-500">Heatmap Sort</label>
+                                <select value={heatmapSortBy} onChange={e => setHeatmapSortBy(e.target.value)} className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-1.5"><option value="BCF">Beat Frequency (BCF)</option><option value="VCL">Curvilinear Velocity (VCL)</option><option value="ALH">Head Displacement (ALH)</option></select>
+                            </div>
+                            <div className="flex gap-4 pt-2">
+                                <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={visibleGroups.WT} onChange={e => setVisibleGroups(p => ({...p, WT: e.target.checked}))} className="rounded text-blue-600"/><span className="text-xs font-medium text-slate-700">WT</span></label>
+                                <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={visibleGroups.KO} onChange={e => setVisibleGroups(p => ({...p, KO: e.target.checked}))} className="rounded text-red-600"/><span className="text-xs font-medium text-slate-700">KO</span></label>
+                                <label className="flex items-center gap-2 cursor-pointer ml-auto"><input type="checkbox" checked={showDensity} onChange={e => setShowDensity(e.target.checked)} className="rounded text-indigo-600"/><span className="text-xs text-slate-500">Density</span></label>
+                            </div>
+                        </div>
+                    </aside>
+                    <main className="main-content bg-slate-50">
+                        {!processedData.length ? (
+                            <div className="h-full flex flex-col items-center justify-center text-slate-400"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mb-4 text-slate-300"><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" /></svg><p className="text-lg font-medium">Ready for Analysis</p><p className="text-sm">Load Demo Dataset or Upload your CSV files</p></div>
+                        ) : (
+                            <div className="max-w-7xl mx-auto space-y-6 pb-12">
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[550px] h-auto">
+                                    <div className="lg:col-span-5 panel-card p-2 flex flex-col h-[500px] lg:h-full"><div ref={heatmapRef} className="flex-1 w-full min-h-0"/></div>
+                                    <div className="lg:col-span-7 panel-card p-2 flex flex-col h-[500px] lg:h-full"><div ref={scatterRef} className="flex-1 w-full min-h-0"/></div>
+                                </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                    <div className="lg:col-span-8 panel-card p-4 h-[450px] flex flex-col"><div ref={boxRef} className="flex-1 w-full min-h-0"/></div>
+                                    <div className="lg:col-span-4 panel-card p-0 flex flex-col h-[450px]">
+                                        <div className="p-4 border-b bg-slate-50"><h3 className="font-bold text-slate-800">Summary Statistics</h3><p className="text-xs text-slate-500">Filtered Dataset</p></div>
+                                        <div className="overflow-y-auto p-4 space-y-4">
+                                            {summaryStats && Object.keys(summaryStats).map(key => {
+                                                const stat = summaryStats[key];
+                                                const unit = METRICS_INFO[key]?.unit || "";
+                                                return (<div key={key} className="text-sm"><div className="flex justify-between items-end mb-2"><span className="font-bold text-slate-700">{key} <span className="text-xs font-normal text-slate-400">[{unit}]</span></span><span className={`text-xs px-2 py-0.5 rounded-full font-mono ${stat.p.toString().includes('<') ? 'bg-indigo-100 text-indigo-700 font-bold' : 'bg-slate-100 text-slate-500'}`}>{formatPValue(stat.p)}</span></div><div className="grid grid-cols-2 gap-3 text-xs"><div className="bg-blue-50 p-2 rounded border border-blue-100"><span className="text-blue-700 font-bold block mb-1">WT (n={stat.WT.n})</span><span className="text-slate-700 block">{stat.WT.mean.toFixed(1)} ± {stat.WT.std.toFixed(1)}</span></div><div className="bg-red-50 p-2 rounded border border-red-100"><span className="text-red-700 font-bold block mb-1">KO (n={stat.KO.n})</span><span className="text-slate-700 block">{stat.KO.mean.toFixed(1)} ± {stat.KO.std.toFixed(1)}</span></div></div></div>);
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="panel-card p-6 bg-white border-slate-200">
+                                    <h4 className="font-bold text-slate-800 mb-4 text-xs uppercase flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>Metrics Abbreviations / 略語一覧</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-2 text-sm text-slate-600">
+                                        <div className="flex justify-between border-b border-slate-100 pb-1"><span className="font-bold text-slate-800 w-12">VCL</span><span className="flex-1">Curvilinear Velocity</span><span className="text-slate-400">曲線速度</span></div>
+                                        <div className="flex justify-between border-b border-slate-100 pb-1"><span className="font-bold text-slate-800 w-12">VSL</span><span className="flex-1">Straight-Line Velocity</span><span className="text-slate-400">直線速度</span></div>
+                                        <div className="flex justify-between border-b border-slate-100 pb-1"><span className="font-bold text-slate-800 w-12">VAP</span><span className="flex-1">Average Path Velocity</span><span className="text-slate-400">平均経路速度</span></div>
+                                        <div className="flex justify-between border-b border-slate-100 pb-1"><span className="font-bold text-slate-800 w-12">ALH</span><span className="flex-1">Amplitude of Lateral Head Displacement</span><span className="text-slate-400">側向頭部振幅</span></div>
+                                        <div className="flex justify-between border-b border-slate-100 pb-1"><span className="font-bold text-slate-800 w-12">BCF</span><span className="flex-1">Beat Cross Frequency</span><span className="text-slate-400">頭部交差頻度</span></div>
+                                        <div className="flex justify-between border-b border-slate-100 pb-1"><span className="font-bold text-slate-800 w-12">LIN</span><span className="flex-1">Linearity = VSL/VCL</span><span className="text-slate-400">直線性</span></div>
+                                        <div className="flex justify-between border-b border-slate-100 pb-1"><span className="font-bold text-slate-800 w-12">STR</span><span className="flex-1">Straightness = VSL/VAP</span><span className="text-slate-400">直進性</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<Dashboard />);
+    </script>
+</body>
+</html>
