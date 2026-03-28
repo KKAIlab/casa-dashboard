@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional
 
 
 class DatasetCreate(BaseModel):
@@ -14,15 +15,15 @@ class DatasetCreate(BaseModel):
 class DatasetResponse(BaseModel):
     id: str
     name: str
-    genotype: str
-    gene: str
-    experiment_date: str
+    genotype: Optional[str] = ""
+    gene: Optional[str] = "FADS2"
+    experiment_date: Optional[str] = ""
     upload_date: datetime
-    source_type: str
-    total_sperm: int
-    analysis_status: str
-    analysis_message: str
-    file_count: int
+    source_type: Optional[str] = ""
+    total_sperm: int = 0
+    analysis_status: str = "pending"
+    analysis_message: Optional[str] = ""
+    file_count: int = 0
 
     class Config:
         from_attributes = True
