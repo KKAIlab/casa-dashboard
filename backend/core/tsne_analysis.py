@@ -27,10 +27,19 @@ def run_tsne(features: np.ndarray) -> tuple[np.ndarray, int]:
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(features)
 
+    n_samples = len(features)
+    candidate_perplexities = [ppx for ppx in CONFIG.TSNE_PERPLEXITIES if ppx < n_samples]
+
+    # Fallback for very small datasets: use n_samples - 1 as minimum perplexity
+    if not candidate_perplexities:
+        candidate_perplexities = [max(1, n_samples - 1)]
+
     results = {}
-    for ppx in CONFIG.TSNE_PERPLEXITIES:
-        if ppx >= len(features):
-            continue
+    for ppx in candidate_perplexities:
+        tsne_init = CONFIG.TSNE_INIT
+        # PCA init requires n_components <= min(n_samples, n_features); use random for tiny sets
+        if tsne_init == "pca" and n_samples <= 2:
+            tsne_init = "random"
 
         tsne = TSNE(
             n_components=2,
@@ -38,7 +47,7 @@ def run_tsne(features: np.ndarray) -> tuple[np.ndarray, int]:
             random_state=CONFIG.RANDOM_STATE,
             max_iter=CONFIG.TSNE_MAX_ITER,
             learning_rate=CONFIG.TSNE_LEARNING_RATE,
-            init=CONFIG.TSNE_INIT,
+            init=tsne_init,
         )
         embedding = tsne.fit_transform(X_scaled)
         results[ppx] = {
@@ -56,8 +65,10 @@ def run_clustering(embedding: np.ndarray) -> np.ndarray:
     Returns:
         Cluster labels array (0 to N_CLUSTERS-1).
     """
+    # Use at most n_samples clusters to avoid sklearn error on tiny datasets
+    n_clusters = min(CONFIG.N_CLUSTERS, len(embedding))
     kmeans = KMeans(
-        n_clusters=CONFIG.N_CLUSTERS,
+        n_clusters=n_clusters,
         random_state=CONFIG.RANDOM_STATE,
         n_init=CONFIG.KMEANS_N_INIT,
     )
