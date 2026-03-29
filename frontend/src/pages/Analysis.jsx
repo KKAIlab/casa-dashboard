@@ -5,9 +5,6 @@ import ProgressBar from '../components/ProgressBar'
 import TsneLandscape from '../components/charts/TsneLandscape'
 import ClusterProportions from '../components/charts/ClusterProportions'
 import ParameterBoxPlots from '../components/charts/ParameterBoxPlots'
-import Heatmap from '../components/charts/Heatmap'
-import ScatterPlot from '../components/charts/ScatterPlot'
-import ViolinPlot from '../components/charts/ViolinPlot'
 import GenotypeComparison from '../components/charts/GenotypeComparison'
 
 export default function Analysis() {
@@ -29,7 +26,7 @@ export default function Analysis() {
   }, [])
 
   const loadCharts = useCallback(async (id) => {
-    const types = ['tsne_landscape', 'cluster_proportions', 'parameter_box', 'heatmap', 'scatter', 'violin']
+    const types = ['tsne_landscape', 'cluster_proportions', 'parameter_box']
     const results = {}
     for (const type of types) {
       try {
@@ -106,14 +103,7 @@ export default function Analysis() {
             <TsneLandscape data={charts.tsne_landscape} />
             <ClusterProportions data={charts.cluster_proportions} />
           </div>
-          <div className="grid grid-cols-2 gap-6">
-            <ParameterBoxPlots data={charts.parameter_box} />
-            <ScatterPlot data={charts.scatter} />
-          </div>
-          <div className="grid grid-cols-2 gap-6">
-            <Heatmap data={charts.heatmap} />
-            <ViolinPlot data={charts.violin} />
-          </div>
+          <ParameterBoxPlots data={charts.parameter_box} />
 
           <div className="bg-white rounded-xl border p-4">
             <h3 className="font-semibold text-sm mb-3">Cross-Genotype Comparison</h3>
