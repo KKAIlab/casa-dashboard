@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import Plot from 'react-plotly.js'
+import Plot from './Plot'
 
 export default function GenotypeComparison({ data }) {
   const traces = useMemo(() => {

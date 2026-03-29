@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import Plot from 'react-plotly.js'
+import Plot from './Plot'
 import { TSNE_FEATURES, CLUSTER_COLORS, PARAM_INFO } from '../../utils/constants'
 
 export default function ParameterBoxPlots({ data }) {

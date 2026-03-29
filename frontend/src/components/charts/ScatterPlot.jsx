@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import Plot from 'react-plotly.js'
+import Plot from './Plot'
 import { CASA_PARAMS } from '../../utils/constants'
 
 export default function ScatterPlot({ data }) {

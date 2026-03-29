@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import Plot from 'react-plotly.js'
+import Plot from './Plot'
 import { TSNE_FEATURES } from '../../utils/constants'
 
 export default function ViolinPlot({ data }) {
