@@ -40,6 +40,8 @@ export function mapColumns(rows) {
 }
 
 export function filterMotile(rows) {
+  // If no Type column exists, data is already filtered (pre-processed CSV)
+  if (rows.length > 0 && !('Type' in rows[0])) return rows
   return rows.filter(r => r.Type === CONFIG.MOTILE_TYPE)
 }
 

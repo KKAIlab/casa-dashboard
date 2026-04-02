@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { preprocessCSV, readFileText } from '../engine/preprocessing.js'
+import { preprocessCSV, readFileText, parseCSVText } from '../engine/preprocessing.js'
 import { runAnalysisPipeline } from '../engine/pipeline.js'
 import { classifyByProportions, computeDensityScore } from '../engine/prediction.js'
 import { useDB } from './useDB.js'
@@ -23,19 +23,31 @@ export function useEngine() {
 
   const importProcessed = useCallback(async (file, meta) => {
     const text = await readFileText(file)
-    const { data, totalSperm } = preprocessCSV(text, { mouseId: meta.mouseId || 'imported', group: meta.genotype })
-    const hasTsne = data.length > 0 && 'tSNE1' in data[0]
+    const { rows, errors } = parseCSVText(text)
+    if (errors.length > 0 || rows.length === 0) throw new Error('Failed to parse CSV')
+
+    // For processed CSV: use existing Mouse/Group columns, don't filter by Type
+    const data = rows.map(row => ({
+      ...row,
+      Mouse: row.Mouse || meta.mouseId || 'imported',
+      Group: row.Group || meta.genotype || 'unknown',
+    }))
+
+    const hasTsne = 'tSNE1' in data[0] && 'tSNE2' in data[0]
     const id = await db.uploadDataset({
       name: meta.name || file.name.replace('.csv', ''),
-      genotype: meta.genotype, mouseId: meta.mouseId || 'imported',
-      group: meta.genotype, csvText: text, totalSperm, motileSperm: data.length,
+      genotype: meta.genotype, mouseId: meta.mouseId || data[0].Mouse,
+      group: meta.genotype, csvText: text, totalSperm: data.length, motileSperm: data.length,
     })
     if (hasTsne) {
+      const { computeBaselineStats, computeClusterProportions } = await import('../engine/statistics.js')
+      const params = ['VCL', 'VSL', 'VAP', 'LIN', 'STR', 'WOB', 'ALH', 'BCF'].filter(p => p in data[0])
       await db.saveResults(id, {
         tsne: data.map(r => [r.tSNE1, r.tSNE2]),
         clusters: data.map(r => r.Cluster),
-        stats: { baseline: {}, clusterProportions: {} },
-        clusterProps: {}, analyzedData: data,
+        stats: { baseline: computeBaselineStats(data, params), clusterProportions: computeClusterProportions(data) },
+        clusterProps: computeClusterProportions(data),
+        analyzedData: data,
       })
     }
     return id
