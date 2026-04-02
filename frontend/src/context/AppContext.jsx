@@ -16,6 +16,12 @@ function reducer(state, action) {
       return { ...state, selectedDatasetId: action.payload }
     case 'SET_LOADING':
       return { ...state, loading: action.payload }
+    case 'UPDATE_DATASET': {
+      const updated = state.datasets.map(d =>
+        d.id === action.payload.id ? { ...d, ...action.payload } : d
+      )
+      return { ...state, datasets: updated }
+    }
     default:
       return state
   }

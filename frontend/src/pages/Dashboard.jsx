@@ -1,28 +1,26 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useApi } from '../hooks/useApi'
+import { useDB } from '../hooks/useDB'
 import { useAppState } from '../context/AppContext'
-import { ANALYSIS_STATUS } from '../utils/constants'
 
 export default function Dashboard() {
-  const api = useApi()
+  const db = useDB()
   const { state, dispatch } = useAppState()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.getDatasets().then(data => {
+    db.getDatasets().then(data => {
       dispatch({ type: 'SET_DATASETS', payload: data })
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
 
   const datasets = state.datasets
-
   const stats = {
     total: datasets.length,
-    analyzed: datasets.filter(d => d.analysis_status === 'done').length,
-    totalSperm: datasets.reduce((sum, d) => sum + d.total_sperm, 0),
+    analyzed: datasets.filter(d => d.status === 'done').length,
+    totalSperm: datasets.reduce((sum, d) => sum + (d.totalSperm || 0), 0),
     genotypes: [...new Set(datasets.map(d => d.genotype).filter(Boolean))],
   }
 
@@ -31,7 +29,6 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-
       <div className="grid grid-cols-4 gap-4">
         {[
           { label: 'Datasets', value: stats.total },
@@ -45,41 +42,25 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
-
       <div className="bg-white rounded-xl border">
         <div className="p-4 border-b flex justify-between items-center">
           <h3 className="font-semibold">Recent Datasets</h3>
-          <button
-            className="text-sm text-blue-600 hover:text-blue-800"
-            onClick={() => navigate('/data')}
-          >
-            Manage Data
-          </button>
+          <button className="text-sm text-blue-600 hover:text-blue-800" onClick={() => navigate('/data')}>Manage Data</button>
         </div>
         <div className="p-4">
           {datasets.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center py-4">
-              No datasets yet. Go to Data Management to upload.
-            </p>
+            <p className="text-gray-400 text-sm text-center py-4">No datasets yet. Go to Data Management to upload.</p>
           ) : (
             <div className="space-y-2">
               {datasets.slice(0, 5).map(ds => (
-                <div
-                  key={ds.id}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 cursor-pointer"
-                  onClick={() => {
-                    dispatch({ type: 'SELECT_DATASET', payload: ds.id })
-                    navigate('/analysis')
-                  }}
-                >
+                <div key={ds.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 cursor-pointer"
+                  onClick={() => { dispatch({ type: 'SELECT_DATASET', payload: ds.id }); navigate('/analysis') }}>
                   <div>
                     <p className="font-medium text-sm">{ds.name}</p>
-                    <p className="text-xs text-gray-400">
-                      {ds.genotype} &middot; {ds.total_sperm.toLocaleString()} sperm
-                    </p>
+                    <p className="text-xs text-gray-400">{ds.genotype} &middot; {(ds.totalSperm || 0).toLocaleString()} sperm</p>
                   </div>
-                  <span className={`text-xs font-medium ${ANALYSIS_STATUS[ds.analysis_status]?.color}`}>
-                    {ANALYSIS_STATUS[ds.analysis_status]?.label}
+                  <span className={`text-xs font-medium ${ds.status === 'done' ? 'text-green-600' : ds.status === 'error' ? 'text-red-600' : 'text-yellow-600'}`}>
+                    {ds.status === 'done' ? 'Complete' : ds.status === 'error' ? 'Error' : 'Pending'}
                   </span>
                 </div>
               ))}

@@ -1,76 +1,45 @@
 import { useEffect, useState } from 'react'
-import { useApi } from '../hooks/useApi'
+import { useDB } from '../hooks/useDB'
+import { useEngine } from '../hooks/useEngine'
 import { useAppState } from '../context/AppContext'
 import FileUploader from '../components/FileUploader'
 import DataTable from '../components/DataTable'
 
 export default function DataManagement() {
-  const api = useApi()
+  const db = useDB()
+  const engine = useEngine()
   const { state, dispatch } = useAppState()
   const [uploadMode, setUploadMode] = useState('raw')
   const [message, setMessage] = useState('')
 
-  const refresh = () => {
-    api.getDatasets().then(data => dispatch({ type: 'SET_DATASETS', payload: data }))
-  }
-
+  const refresh = () => { db.getDatasets().then(data => dispatch({ type: 'SET_DATASETS', payload: data })) }
   useEffect(() => { refresh() }, [])
 
-  const handleUpload = async (formData, mode) => {
+  const handleUpload = async (file, meta, mode) => {
     try {
-      setMessage('Uploading...')
-      if (mode === 'raw') {
-        await api.uploadFile(formData)
-      } else {
-        await api.importFile(formData)
-      }
+      setMessage('Processing...')
+      if (mode === 'raw') { await engine.uploadAndPreprocess(file, meta) } else { await engine.importProcessed(file, meta) }
       setMessage('Upload successful!')
       refresh()
-    } catch (err) {
-      setMessage(`Error: ${err.response?.data?.detail || err.message}`)
-    }
+    } catch (err) { setMessage(`Error: ${err.message}`) }
   }
 
-  const handleDelete = async (id) => {
-    await api.deleteDataset(id)
-    refresh()
-  }
+  const handleDelete = async (id) => { await db.deleteDataset(id); refresh() }
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900">Data Management</h2>
-
       <div className="bg-white rounded-xl border p-6">
         <div className="flex gap-4 mb-4">
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${
-              uploadMode === 'raw' ? 'bg-blue-600 text-white' : 'bg-gray-100'
-            }`}
-            onClick={() => setUploadMode('raw')}
-          >
-            Upload Raw CASA CSV
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${
-              uploadMode === 'import' ? 'bg-blue-600 text-white' : 'bg-gray-100'
-            }`}
-            onClick={() => setUploadMode('import')}
-          >
-            Import Processed CSV
-          </button>
+          <button className={`px-4 py-2 rounded-lg text-sm font-medium ${uploadMode === 'raw' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`} onClick={() => setUploadMode('raw')}>Upload Raw CASA CSV</button>
+          <button className={`px-4 py-2 rounded-lg text-sm font-medium ${uploadMode === 'import' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`} onClick={() => setUploadMode('import')}>Import Processed CSV</button>
         </div>
         <FileUploader onUpload={handleUpload} mode={uploadMode} />
         {message && <p className="mt-3 text-sm text-gray-600">{message}</p>}
       </div>
-
       <div className="bg-white rounded-xl border p-6">
         <h3 className="font-semibold mb-4">Datasets</h3>
-        <DataTable
-          datasets={state.datasets}
-          selectedId={state.selectedDatasetId}
-          onSelect={id => dispatch({ type: 'SELECT_DATASET', payload: id })}
-          onDelete={handleDelete}
-        />
+        <DataTable datasets={state.datasets} selectedId={state.selectedDatasetId} onSelect={id => dispatch({ type: 'SELECT_DATASET', payload: id })} onDelete={handleDelete} />
       </div>
     </div>
   )

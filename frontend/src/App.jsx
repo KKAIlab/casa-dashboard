@@ -1,5 +1,5 @@
 import { lazy, Suspense, Component } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { HashRouter, Routes, Route } from 'react-router-dom'
 import { AppProvider } from './context/AppContext'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
@@ -9,22 +9,11 @@ const Analysis = lazy(() => import('./pages/Analysis'))
 const Prediction = lazy(() => import('./pages/Prediction'))
 
 class ErrorBoundary extends Component {
-  constructor(props) {
-    super(props)
-    this.state = { error: null }
-  }
-  static getDerivedStateFromError(error) {
-    return { error }
-  }
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
   render() {
     if (this.state.error) {
-      return (
-        <div style={{ padding: 40, color: 'red' }}>
-          <h2>Something went wrong</h2>
-          <pre>{this.state.error.message}</pre>
-          <pre>{this.state.error.stack}</pre>
-        </div>
-      )
+      return (<div style={{ padding: 40, color: 'red' }}><h2>Something went wrong</h2><pre>{this.state.error.message}</pre><pre>{this.state.error.stack}</pre></div>)
     }
     return this.props.children
   }
@@ -36,7 +25,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AppProvider>
-        <BrowserRouter>
+        <HashRouter>
           <Routes>
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
@@ -45,7 +34,7 @@ export default function App() {
               <Route path="/prediction" element={<Suspense fallback={<Loading />}><Prediction /></Suspense>} />
             </Route>
           </Routes>
-        </BrowserRouter>
+        </HashRouter>
       </AppProvider>
     </ErrorBoundary>
   )
