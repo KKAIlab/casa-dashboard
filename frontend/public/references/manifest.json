@@ -1,0 +1,22 @@
+{
+  "references": [
+    {
+      "id": "who_human_fertile",
+      "name": "WHO Human — Fertile (normospermic)",
+      "file": "who_human_fertile.csv",
+      "group": "fertile",
+      "donors": 3,
+      "cells": 465,
+      "description": "Synthetic cell-level CSV with WHO 5th-edition normative human distributions. PR≈55%, hyperactivated≈10%, VCL≈95±18 µm/s. Built from published reference ranges (WHO 2010, Mortimer 1990, Holt 1985); not real-patient data."
+    },
+    {
+      "id": "who_human_subfertile",
+      "name": "WHO Human — Subfertile (asthenozoospermia)",
+      "file": "who_human_subfertile.csv",
+      "group": "subfertile",
+      "donors": 3,
+      "cells": 445,
+      "description": "Synthetic cell-level CSV mimicking sub-WHO motility profiles. PR≈22%, hyperactivated≈3%, VCL≈55±18 µm/s. Useful as a contrastive reference for the Prediction page."
+    }
+  ]
+}

@@ -56,11 +56,26 @@ export default function Prediction() {
       </div>
       <div className="bg-white rounded-xl border p-4">
         <h3 className="font-semibold text-sm mb-2">Reference Data</h3>
-        <p className="text-xs text-gray-400 mb-3">Upload a CSV with labeled reference populations (fertile/subfertile).</p>
-        <button className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50" onClick={() => refInputRef.current?.click()}>
-          {refFile ? refFile.name : 'Choose reference CSV...'}
-        </button>
-        <input ref={refInputRef} type="file" accept=".csv" className="hidden" onChange={e => setRefFile(e.target.files[0])} />
+        <p className="text-xs text-gray-400 mb-3">Upload a labeled reference CSV, or load the built-in WHO human reference (synthetic, drawn from WHO 5th-ed normative ranges).</p>
+        <div className="flex flex-wrap gap-2 items-center">
+          <button className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50" onClick={() => refInputRef.current?.click()}>
+            {refFile ? refFile.name : 'Choose reference CSV...'}
+          </button>
+          <input ref={refInputRef} type="file" accept=".csv" className="hidden" onChange={e => setRefFile(e.target.files[0])} />
+          <button
+            className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50"
+            onClick={async () => {
+              try {
+                const url = `${import.meta.env.BASE_URL || '/'}references/who_human_fertile.csv`
+                const res = await fetch(url)
+                if (!res.ok) throw new Error('Failed to fetch reference')
+                const text = await res.text()
+                const blob = new Blob([text], { type: 'text/csv' })
+                setRefFile(new File([blob], 'who_human_fertile.csv', { type: 'text/csv' }))
+                setError('')
+              } catch (err) { setError(err.message) }
+            }}>Use WHO fertile reference</button>
+        </div>
       </div>
       {error && <p className="text-red-500 text-sm">{error}</p>}
       <div className="grid grid-cols-2 gap-6">

@@ -4,6 +4,7 @@ import { useEngine } from '../hooks/useEngine'
 import { useAppState } from '../context/AppContext'
 import FileUploader from '../components/FileUploader'
 import DataTable from '../components/DataTable'
+import ReferenceLoader from '../components/ReferenceLoader'
 
 export default function DataManagement() {
   const db = useDB()
@@ -45,6 +46,7 @@ export default function DataManagement() {
         <FileUploader onUpload={handleUpload} mode={uploadMode} />
         {message && <p className="mt-3 text-sm text-gray-600">{message}</p>}
       </div>
+      <ReferenceLoader onLoad={async (url, meta) => { await engine.importFromURL(url, meta); refresh() }} />
       <div className="bg-white rounded-xl border p-6">
         <h3 className="font-semibold mb-4">Datasets</h3>
         <DataTable

@@ -222,7 +222,12 @@ A: WHO 5th edition motility categories and Mortimer's hyperactivation criteria:
 These are computed automatically and shown in the WHO Motility Classification chart.
 
 **Q: I just want to try it without uploading anything.**
-A: Click **Download sample CSV** at the top right of the Data Management page, then re-upload it via "Import Processed CSV". You'll see the full UI with synthetic WT vs KO data.
+A: Two options on the Data Management page:
+- **Download sample CSV** (top right) — synthetic WT vs KO mouse data with t-SNE pre-computed; re-upload via "Import Processed CSV".
+- **Built-in Human References** section — one-click load of synthetic human cell-level data drawn from WHO 5th-edition normative ranges (fertile and subfertile profiles). After loading, run analysis from the Analysis page.
+
+**Q: Is there real human CASA data I can use?**
+A: Yes — the **VISEM** dataset (SimulaMet/NTNU, CC BY 4.0) contains real human sperm video CASA measurements for ~85 donors. We can't redistribute it, but `scripts/import_visem.mjs` converts it into the dashboard's CSV schema. See [Using real human data: VISEM](#using-real-human-data-visem) below.
 
 ---
 
@@ -284,9 +289,59 @@ cd frontend && npm test
 
 ---
 
+## Using real human data: VISEM
+
+[VISEM](https://datasets.simula.no/visem/) (Haugen et al., SimulaMet/NTNU) is a
+publicly released human sperm dataset under **CC BY 4.0** that includes
+per-participant semen analysis and frame-level CASA measurements for ~85 donors.
+We do **not** redistribute it; download it from the official dataset page and
+convert it locally:
+
+```bash
+# 1. Download VISEM from its dataset page (search "VISEM SimulaMet").
+#    Expected layout after extraction:
+#      visem/
+#        semen_analysis_data.csv      # per-participant aggregates (PR%, IM%, …)
+#        videos/<participant_id>/*.csv  # per-video CASA frames
+
+# 2. Convert into the dashboard's CSV schema.
+node scripts/import_visem.mjs ./visem ./visem_csv
+
+# 3. Each visem_csv/visem_<participant>.csv can be uploaded via
+#    Data Management → "Import Processed CSV".
+#    Group is auto-labelled "normal" / "subnormal" using WHO 5th ed. PR ≥ 32%.
+```
+
+Options:
+
+| Flag | Meaning |
+|------|---------|
+| `--frames-per-cell N` | Average every N consecutive frames into one synthetic "cell" (default 30, ~1 s at 30 fps). Set to 1 to keep per-frame rows. |
+| `--max-participants N` | Limit number of participants processed (debugging). |
+| `--dry-run` | Parse and report counts only; no files written. |
+
+The script lives at [`scripts/import_visem.mjs`](scripts/import_visem.mjs); see
+the file header for full schema mapping notes.
+
+## Built-in reference data (synthetic)
+
+For users who don't have real human data on hand, the dashboard ships two
+reference CSVs in [`frontend/public/references/`](frontend/public/references):
+
+- `who_human_fertile.csv` — 3 donors, 465 cells, drawn from WHO 5th-ed. normative
+  ranges (PR≈55%, hyperactivated≈10%, VCL≈95±18 µm/s).
+- `who_human_subfertile.csv` — 3 donors, 445 cells, asthenozoospermia profile
+  (PR≈22%, hyperactivated≈3%, VCL≈55±18 µm/s).
+
+Both load via the **Built-in Human References** card on Data Management. They
+are derived from published distributions (WHO 2010, Mortimer 1990, Holt 1985)
+and are clearly labelled as synthetic — they are **not** real patient data.
+
 ## Reference
 
-Fernandez-Lopez, P. et al. (2022). "Predicting fertility from sperm motility landscapes." *Communications Biology* 5:1027. doi:10.1038/s42003-022-03986-2
+- Fernandez-Lopez, P. et al. (2022). "Predicting fertility from sperm motility landscapes." *Communications Biology* 5:1027. doi:10.1038/s42003-022-03986-2
+- WHO (2010). *WHO Laboratory Manual for the Examination and Processing of Human Semen, 5th edition.*
+- Haugen, T. B. et al. (2019). "VISEM: A multimodal video dataset of human spermatozoa." *Proc. ACM Multimedia Systems Conference (MMSys '19).*
 
 ## License
 

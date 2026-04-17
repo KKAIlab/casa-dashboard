@@ -21,6 +21,22 @@ export function useEngine() {
     })
   }, [db])
 
+  // Import a CSV fetched from a URL (used for built-in reference datasets).
+  const importFromURL = useCallback(async (url, meta) => {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`)
+    const text = await res.text()
+    const { totalSperm, motileSperm, error } = preprocessCSV(text, meta)
+    if (error) throw new Error(error)
+    return db.uploadDataset({
+      name: meta.name || url.split('/').pop().replace('.csv', ''),
+      genotype: meta.genotype,
+      mouseId: meta.mouseId,
+      group: meta.group || meta.genotype,
+      csvText: text, totalSperm, motileSperm,
+    })
+  }, [db])
+
   const importProcessed = useCallback(async (file, meta) => {
     const text = await readFileText(file)
     const { rows, errors } = parseCSVText(text)
@@ -138,5 +154,5 @@ export function useEngine() {
     throw new Error(`Unknown model type: ${modelType}`)
   }, [db])
 
-  return { uploadAndPreprocess, importProcessed, analyze, getChartData, compareDatasets, predict, progress }
+  return { uploadAndPreprocess, importProcessed, importFromURL, analyze, getChartData, compareDatasets, predict, progress }
 }
