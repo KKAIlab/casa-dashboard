@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { preprocessCSV, readFileText, parseCSVText } from '../engine/preprocessing.js'
 import { runAnalysisPipeline } from '../engine/pipeline.js'
 import { classifyByProportions, computeDensityScore } from '../engine/prediction.js'
+import { trainFertilityAxis, projectOnAxis, summarizeScoresByMouse, coEmbed } from '../engine/crossSpecies.js'
 import { useDB } from './useDB.js'
 
 export function useEngine() {
@@ -154,5 +155,60 @@ export function useEngine() {
     throw new Error(`Unknown model type: ${modelType}`)
   }, [db])
 
-  return { uploadAndPreprocess, importProcessed, importFromURL, analyze, getChartData, compareDatasets, predict, progress }
+  // --- Cross-species helpers ---------------------------------------------
+
+  // Pull cell-level rows for a list of dataset IDs. Datasets without analysis
+  // results fall back to the raw CSV so the user can train an axis on freshly
+  // uploaded references without having to run t-SNE first.
+  const loadCellRows = useCallback(async (datasetIds) => {
+    const out = []
+    for (const id of datasetIds) {
+      const ds = await db.getDataset(id)
+      if (!ds) continue
+      const r = await db.getResults(id)
+      if (r?.analyzedData?.length) {
+        for (const row of r.analyzedData) out.push({ ...row, _datasetId: id, _datasetName: ds.name })
+      } else if (ds.raw) {
+        const { data } = preprocessCSV(ds.raw, { mouseId: ds.mouseId, group: ds.group })
+        for (const row of data) out.push({ ...row, _datasetId: id, _datasetName: ds.name })
+      }
+    }
+    return out
+  }, [db])
+
+  // Train a fertility axis from the union of one or more "fertile" datasets
+  // and one or more "subfertile" datasets. Labels are forced regardless of
+  // the dataset's stored Group so users can pick the role at training time.
+  const trainAxis = useCallback(async (posIds, negIds, params) => {
+    const posRows = (await loadCellRows(posIds)).map(r => ({ ...r, Group: '__POS__' }))
+    const negRows = (await loadCellRows(negIds)).map(r => ({ ...r, Group: '__NEG__' }))
+    const axis = trainFertilityAxis([...posRows, ...negRows], params, '__POS__', '__NEG__')
+    return { axis, posCount: posRows.length, negCount: negRows.length }
+  }, [loadCellRows])
+
+  // Project mouse datasets onto a trained axis and return per-mouse summary.
+  const projectDatasets = useCallback(async (datasetIds, axis) => {
+    const rows = await loadCellRows(datasetIds)
+    if (rows.length === 0) return { rows: [], scores: [], summary: {} }
+    const scores = projectOnAxis(rows, axis)
+    const summary = summarizeScoresByMouse(rows, scores)
+    return { rows, scores, summary }
+  }, [loadCellRows])
+
+  // Run a combined t-SNE on cells from multiple datasets, with per-dataset
+  // standardization on by default to remove species-level scale bias.
+  const runCoEmbed = useCallback(async (sourceSpecs, params, opts) => {
+    const sources = []
+    for (const spec of sourceSpecs) {
+      const rows = await loadCellRows(spec.datasetIds)
+      if (rows.length > 0) sources.push({ rows, label: spec.label })
+    }
+    return coEmbed(sources, params, opts)
+  }, [loadCellRows])
+
+  return {
+    uploadAndPreprocess, importProcessed, importFromURL, analyze,
+    getChartData, compareDatasets, predict, progress,
+    trainAxis, projectDatasets, runCoEmbed,
+  }
 }

@@ -7,6 +7,7 @@ import DataManagement from './pages/DataManagement'
 
 const Analysis = lazy(() => import('./pages/Analysis'))
 const Prediction = lazy(() => import('./pages/Prediction'))
+const CrossSpecies = lazy(() => import('./pages/CrossSpecies'))
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
@@ -31,6 +32,7 @@ export default function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/data" element={<DataManagement />} />
               <Route path="/analysis" element={<Suspense fallback={<Loading />}><Analysis /></Suspense>} />
+              <Route path="/cross-species" element={<Suspense fallback={<Loading />}><CrossSpecies /></Suspense>} />
               <Route path="/prediction" element={<Suspense fallback={<Loading />}><Prediction /></Suspense>} />
             </Route>
           </Routes>

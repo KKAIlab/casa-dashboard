@@ -30,10 +30,11 @@ This tool takes CASA (Computer-Assisted Sperm Analysis) data and creates an inte
 
 Go to **[https://kkailab.github.io/casa-dashboard/](https://kkailab.github.io/casa-dashboard/)**
 
-You'll see a sidebar with 4 pages:
+You'll see a sidebar with 5 pages:
 - **Dashboard** — overview of your uploaded datasets
 - **Data Management** — upload and manage CSV files
 - **Analysis** — run t-SNE and view results
+- **Cross-Species** — train a human fertility axis, project mouse data onto it, co-embed both species
 - **Prediction** — compare against reference populations
 
 ### Step 2: Upload your data
@@ -258,10 +259,11 @@ frontend/
 │   │   ├── motility.js      # WHO classification + hyperactivation detection
 │   │   ├── exporter.js      # CSV serialization + browser download helpers
 │   │   ├── prediction.js    # Cluster classifier, density scoring
+│   │   ├── crossSpecies.js  # Fertility-axis training + projection + co-embed
 │   │   └── pipeline.js      # Orchestrates the full analysis
 │   ├── db/              # IndexedDB storage layer (idb)
 │   ├── hooks/           # React hooks (useDB, useEngine)
-│   ├── pages/           # Dashboard, DataManagement, Analysis, Prediction
+│   ├── pages/           # Dashboard, DataManagement, Analysis, CrossSpecies, Prediction
 │   └── components/      # Charts (Plotly), FileUploader, DataTable, GroupComparisonPanel, StatsSummaryTable
 ├── public/
 │   └── sample_processed.csv  # Synthetic WT vs KO dataset for trying the UI
@@ -282,12 +284,59 @@ frontend/
 
 ```bash
 cd frontend && npm test
-# 49 tests across 11 test files
+# 54 tests across 12 test files
 # Covers: config, preprocessing, clustering, t-SNE, statistics, motility classification,
-#         CSV exporter, group comparison, prediction, full pipeline, IndexedDB
+#         CSV exporter, group comparison, cross-species axis + co-embed, prediction,
+#         full pipeline, IndexedDB
 ```
 
 ---
+
+## Cross-species bridging: mouse → human fertility
+
+The **Cross-Species** page answers a translational question:
+*do my KO mouse sperm look more like human-fertile or human-subfertile cells?*
+
+It combines two complementary readouts:
+
+**B. Fertility-axis projection (quantitative)** — train a Fisher-style linear
+discriminant on standardized CASA features from human fertile vs subfertile
+references. Each new cell gets a signed score (positive = closer to the
+fertile pole) and a logistic-squashed P(fertile). Per-mouse means feed a
+between-group Welch's t-test, e.g. *WT vs Omega6-HUFA-deficient*.
+
+**A. Co-embedded landscape (qualitative)** — combined t-SNE of human + mouse
+cells with per-source z-score normalization, so absolute scale differences
+(mouse VCL ~200 vs human ~90 µm/s) don't dominate the layout. Lets you
+visually check whether KO mouse cells overlap the human-subfertile region.
+
+### Workflow
+
+1. **Load human reference data** — Data Management → "Built-in Human References"
+   loads `who_human_fertile.csv` and `who_human_subfertile.csv`. Or upload
+   real VISEM data (see below).
+2. **Upload mouse data** — Data Management → "Upload Raw CASA CSV" for each
+   mouse. Use the `Group` field for *WT* / *Omega6KO* / etc.
+3. **Cross-Species page**:
+   - Pick the fertile dataset(s) as the *positive pole*, subfertile as the
+     *negative pole*, choose features (default: VCL, VSL, LIN, ALH, BCF), and
+     click **Train axis**. Inspect feature weights and train accuracy.
+   - Pick mouse datasets and click **Project**. You get score histograms
+     overlaid on the human reference distributions, a per-mouse summary table,
+     and a Welch t-test between mouse Groups.
+   - Click **Run co-embedding** for the qualitative t-SNE landscape.
+4. **Export per-mouse scores** as CSV for downstream stats / figures.
+
+### Caveats
+
+- The axis is linear in standardized feature space; it cannot capture
+  non-linear motility-class interactions. For a non-linear classifier,
+  pre-cluster cells and project on cluster proportions instead.
+- Per-mouse t-test treats mice as the experimental unit (correct for
+  pseudoreplication); cell-level tests will be much more "significant" but
+  inflated.
+- Synthetic WHO references are useful as smoke-test scaffolding; for
+  publication-grade comparisons use real human data (VISEM, in-house cohort).
 
 ## Using real human data: VISEM
 

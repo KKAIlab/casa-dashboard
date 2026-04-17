@@ -4,6 +4,7 @@ const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: '◉' },
   { to: '/data', label: 'Data Management', icon: '◫' },
   { to: '/analysis', label: 'Analysis', icon: '◈' },
+  { to: '/cross-species', label: 'Cross-Species', icon: '⇌' },
   { to: '/prediction', label: 'Prediction', icon: '◇' },
 ]
 
