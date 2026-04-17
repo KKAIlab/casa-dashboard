@@ -41,13 +41,19 @@ export function useEngine() {
     })
     if (hasTsne) {
       const { computeBaselineStats, computeClusterProportions } = await import('../engine/statistics.js')
+      const { annotateMotility, computeMotilitySummary } = await import('../engine/motility.js')
       const params = ['VCL', 'VSL', 'VAP', 'LIN', 'STR', 'WOB', 'ALH', 'BCF'].filter(p => p in data[0])
+      const annotated = annotateMotility(data)
       await db.saveResults(id, {
-        tsne: data.map(r => [r.tSNE1, r.tSNE2]),
-        clusters: data.map(r => r.Cluster),
-        stats: { baseline: computeBaselineStats(data, params), clusterProportions: computeClusterProportions(data) },
-        clusterProps: computeClusterProportions(data),
-        analyzedData: data,
+        tsne: annotated.map(r => [r.tSNE1, r.tSNE2]),
+        clusters: annotated.map(r => r.Cluster),
+        stats: {
+          baseline: computeBaselineStats(annotated, params),
+          clusterProportions: computeClusterProportions(annotated),
+          motilitySummary: computeMotilitySummary(annotated),
+        },
+        clusterProps: computeClusterProportions(annotated),
+        analyzedData: annotated,
       })
     }
     return id

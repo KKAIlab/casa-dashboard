@@ -21,4 +21,12 @@ export const CONFIG = {
   N_CLUSTERS: 5,
   KMEANS_N_INIT: 10,
   RANDOM_STATE: 42,
+  // WHO 5th ed. motility cutoffs (µm/s)
+  WHO_PROGRESSIVE_VAP: 25,
+  WHO_PROGRESSIVE_VSL: 20,
+  WHO_IMMOTILE_VCL: 5,
+  // Mortimer hyperactivation thresholds
+  HYPERACT_VCL: 150,
+  HYPERACT_LIN: 0.5,
+  HYPERACT_ALH: 7,
 }

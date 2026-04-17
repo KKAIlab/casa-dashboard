@@ -44,11 +44,35 @@ export function computeClusterProportions(data) {
 
 export function welchTTest(a, b) {
   const nA = a.length, nB = b.length
+  if (nA < 2 || nB < 2) return { tStat: NaN, pValue: NaN, df: NaN }
   const meanA = jStat.mean(a), meanB = jStat.mean(b)
   const varA = jStat.variance(a, true), varB = jStat.variance(b, true)
   const seA = varA / nA, seB = varB / nB
-  const tStat = (meanA - meanB) / Math.sqrt(seA + seB)
+  const denom = Math.sqrt(seA + seB)
+  if (denom === 0) return { tStat: 0, pValue: 1, df: nA + nB - 2 }
+  const tStat = (meanA - meanB) / denom
   const df = (seA + seB) ** 2 / (seA ** 2 / (nA - 1) + seB ** 2 / (nB - 1))
   const pValue = 2 * (1 - jStat.studentt.cdf(Math.abs(tStat), df))
   return { tStat, pValue, df }
+}
+
+// Compare two groups across multiple parameters with Welch's t-test.
+// rows: array with .Group and parameter columns. groupA/groupB: group label strings.
+// Returns: { [param]: { meanA, meanB, nA, nB, tStat, pValue, df } }
+export function compareGroups(rows, groupA, groupB, params) {
+  const result = {}
+  const aRows = rows.filter(r => (r.Group ?? r.genotype) === groupA)
+  const bRows = rows.filter(r => (r.Group ?? r.genotype) === groupB)
+  for (const p of params) {
+    const a = aRows.map(r => r[p]).filter(v => v != null && !isNaN(v))
+    const b = bRows.map(r => r[p]).filter(v => v != null && !isNaN(v))
+    const t = welchTTest(a, b)
+    result[p] = {
+      meanA: a.length ? jStat.mean(a) : NaN,
+      meanB: b.length ? jStat.mean(b) : NaN,
+      nA: a.length, nB: b.length,
+      ...t,
+    }
+  }
+  return result
 }

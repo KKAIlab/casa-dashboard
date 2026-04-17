@@ -1,4 +1,4 @@
-export default function DataTable({ datasets, onSelect, onDelete, selectedId }) {
+export default function DataTable({ datasets, onSelect, onDelete, onRename, selectedId }) {
   if (datasets.length === 0) return <p className="text-gray-400 text-sm py-8 text-center">No datasets uploaded yet.</p>
   return (
     <div className="overflow-x-auto">
@@ -14,7 +14,21 @@ export default function DataTable({ datasets, onSelect, onDelete, selectedId }) 
             <td className="py-2 px-3">{(ds.totalSperm || 0).toLocaleString()}</td>
             <td className={`py-2 px-3 ${ds.status === 'done' ? 'text-green-600' : ds.status === 'error' ? 'text-red-600' : 'text-yellow-600'}`}>
               {ds.status === 'done' ? 'Complete' : ds.status === 'error' ? 'Error' : 'Pending'}</td>
-            <td className="py-2 px-3"><button className="text-red-500 hover:text-red-700 text-xs" onClick={e => { e.stopPropagation(); onDelete(ds.id) }}>Delete</button></td>
+            <td className="py-2 px-3 flex gap-3">
+              {onRename && (
+                <button
+                  className="text-blue-600 hover:text-blue-800 text-xs"
+                  onClick={e => {
+                    e.stopPropagation()
+                    const next = window.prompt('New dataset name', ds.name)
+                    if (next && next.trim() && next !== ds.name) onRename(ds.id, next.trim())
+                  }}>Rename</button>
+              )}
+              <button className="text-red-500 hover:text-red-700 text-xs" onClick={e => {
+                e.stopPropagation()
+                if (window.confirm(`Delete "${ds.name}"? This cannot be undone.`)) onDelete(ds.id)
+              }}>Delete</button>
+            </td>
           </tr>
         ))}</tbody>
       </table>

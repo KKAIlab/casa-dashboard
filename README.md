@@ -16,8 +16,10 @@ This tool takes CASA (Computer-Assisted Sperm Analysis) data and creates an inte
 
 - **Upload** your CASA CSV files (directly from the CASA software, Japanese or English)
 - **Visualize** t-SNE motility landscapes with automatic clustering
-- **Compare** different genotypes or treatment groups side-by-side
-- **Analyze** cluster proportions and parameter distributions per mouse
+- **Classify** cells by WHO 5th-ed. motility categories (PR / NP / IM) and Mortimer hyperactivation criteria
+- **Compare** different genotypes or treatment groups side-by-side with Welch's t-test
+- **Analyze** cluster proportions, parameter distributions, and per-mouse summary stats
+- **Export** analyzed cell data, per-mouse stats, motility summaries, and comparison tables as CSV
 - **Predict** fertility potential using reference population comparison
 
 ---
@@ -199,7 +201,28 @@ A: Expected. t-SNE results vary between implementations due to initialization an
 A: In your browser's IndexedDB. It stays on your computer and survives page refreshes. Clearing browser data or using a different browser/device will start fresh.
 
 **Q: Can I export the results?**
-A: Currently, you can use the Plotly toolbar on each chart to download as SVG/PNG. CSV export is planned for a future version.
+A: Yes. After running analysis, the Analysis page shows an Export bar with four buttons:
+- **Cells (full)** — every analyzed cell with all CASA parameters, t-SNE coords, cluster, WHO class, hyperactivation flag.
+- **Per-mouse means** — mean ± SD of every CASA parameter per mouse.
+- **WHO motility** — per-mouse counts and percentages for PR/NP/IM and hyperactivated.
+- **Cluster proportions** — per-mouse cluster distribution (%).
+
+For comparison tables, the Cross-Genotype Comparison panel has its own Export CSV button. Plot toolbar still lets you save individual figures as SVG/PNG.
+
+**Q: What are PR / NP / IM and Hyperactivated?**
+A: WHO 5th edition motility categories and Mortimer's hyperactivation criteria:
+
+| Label | Meaning | Cutoff |
+|-------|---------|--------|
+| **PR** | Progressive | VAP ≥ 25 µm/s OR VSL ≥ 20 µm/s |
+| **NP** | Non-progressive | Motile but below progressive cutoffs |
+| **IM** | Immotile | VCL ≤ 5 µm/s |
+| **Hyperactivated** | Mortimer criteria | VCL ≥ 150 µm/s AND LIN ≤ 0.5 AND ALH ≥ 7 µm |
+
+These are computed automatically and shown in the WHO Motility Classification chart.
+
+**Q: I just want to try it without uploading anything.**
+A: Click **Download sample CSV** at the top right of the Data Management page, then re-upload it via "Import Processed CSV". You'll see the full UI with synthetic WT vs KO data.
 
 ---
 
@@ -222,17 +245,21 @@ npm run build        # production build to dist/
 frontend/
 ├── src/
 │   ├── engine/          # Analysis engine (pure JS, no dependencies on React)
-│   │   ├── config.js        # Fixed CASA parameters
+│   │   ├── config.js        # Fixed CASA parameters + WHO/Mortimer cutoffs
 │   │   ├── preprocessing.js # CSV parsing, column mapping, motile filtering
 │   │   ├── tsne.js          # t-SNE implementation
 │   │   ├── clustering.js    # K-Means + z-score standardization
-│   │   ├── statistics.js    # Descriptive stats, Welch's t-test
+│   │   ├── statistics.js    # Descriptive stats, Welch's t-test, group comparison
+│   │   ├── motility.js      # WHO classification + hyperactivation detection
+│   │   ├── exporter.js      # CSV serialization + browser download helpers
 │   │   ├── prediction.js    # Cluster classifier, density scoring
 │   │   └── pipeline.js      # Orchestrates the full analysis
 │   ├── db/              # IndexedDB storage layer (idb)
 │   ├── hooks/           # React hooks (useDB, useEngine)
 │   ├── pages/           # Dashboard, DataManagement, Analysis, Prediction
-│   └── components/      # Charts (Plotly), FileUploader, DataTable
+│   └── components/      # Charts (Plotly), FileUploader, DataTable, GroupComparisonPanel, StatsSummaryTable
+├── public/
+│   └── sample_processed.csv  # Synthetic WT vs KO dataset for trying the UI
 ├── __tests__/           # Vitest tests for engine and DB
 └── vite.config.js       # Vite + React + Tailwind CSS
 ```
@@ -250,8 +277,9 @@ frontend/
 
 ```bash
 cd frontend && npm test
-# 32 tests across 8 test files
-# Covers: config, preprocessing, clustering, t-SNE, statistics, prediction, pipeline, IndexedDB
+# 49 tests across 11 test files
+# Covers: config, preprocessing, clustering, t-SNE, statistics, motility classification,
+#         CSV exporter, group comparison, prediction, full pipeline, IndexedDB
 ```
 
 ---

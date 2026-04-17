@@ -25,10 +25,18 @@ export default function DataManagement() {
   }
 
   const handleDelete = async (id) => { await db.deleteDataset(id); refresh() }
+  const handleRename = async (id, name) => { await db.updateDataset(id, { name }); refresh() }
+
+  const sampleUrl = `${import.meta.env.BASE_URL || '/'}sample_processed.csv`
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Data Management</h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-900">Data Management</h2>
+        <a href={sampleUrl} download className="text-sm text-blue-600 hover:text-blue-800 underline">
+          Download sample CSV
+        </a>
+      </div>
       <div className="bg-white rounded-xl border p-6">
         <div className="flex gap-4 mb-4">
           <button className={`px-4 py-2 rounded-lg text-sm font-medium ${uploadMode === 'raw' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`} onClick={() => setUploadMode('raw')}>Upload Raw CASA CSV</button>
@@ -39,7 +47,13 @@ export default function DataManagement() {
       </div>
       <div className="bg-white rounded-xl border p-6">
         <h3 className="font-semibold mb-4">Datasets</h3>
-        <DataTable datasets={state.datasets} selectedId={state.selectedDatasetId} onSelect={id => dispatch({ type: 'SELECT_DATASET', payload: id })} onDelete={handleDelete} />
+        <DataTable
+          datasets={state.datasets}
+          selectedId={state.selectedDatasetId}
+          onSelect={id => dispatch({ type: 'SELECT_DATASET', payload: id })}
+          onDelete={handleDelete}
+          onRename={handleRename}
+        />
       </div>
     </div>
   )

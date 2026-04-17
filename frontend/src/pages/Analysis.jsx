@@ -7,15 +7,25 @@ import TsneLandscape from '../components/charts/TsneLandscape'
 import ClusterProportions from '../components/charts/ClusterProportions'
 import ParameterBoxPlots from '../components/charts/ParameterBoxPlots'
 import GenotypeComparison from '../components/charts/GenotypeComparison'
+import MotilityBreakdown from '../components/charts/MotilityBreakdown'
+import Heatmap from '../components/charts/Heatmap'
+import StatsSummaryTable from '../components/StatsSummaryTable'
+import GroupComparisonPanel from '../components/GroupComparisonPanel'
+import {
+  rowsToCSV, downloadText, baselineStatsToRows,
+  motilitySummaryToRows, clusterPropsToRows,
+} from '../engine/exporter'
 
 export default function Analysis() {
   const db = useDB()
   const engine = useEngine()
   const { state, dispatch } = useAppState()
   const [charts, setCharts] = useState({})
+  const [results, setResults] = useState(null)
   const [datasets, setDatasets] = useState([])
   const [compareIds, setCompareIds] = useState([])
   const [compareData, setCompareData] = useState(null)
+  const [compareRows, setCompareRows] = useState([])
   const [analyzing, setAnalyzing] = useState(false)
 
   const selectedId = state.selectedDatasetId
@@ -26,14 +36,19 @@ export default function Analysis() {
 
   const loadCharts = useCallback(async (id) => {
     const types = ['tsne_landscape', 'cluster_proportions', 'parameter_box']
-    const results = {}
-    for (const type of types) { try { results[type] = await engine.getChartData(id, type) } catch { /* skip */ } }
-    setCharts(results)
-  }, [engine])
+    const out = {}
+    for (const type of types) { try { out[type] = await engine.getChartData(id, type) } catch { /* skip */ } }
+    setCharts(out)
+    const r = await db.getResults(id)
+    setResults(r)
+  }, [engine, db])
 
   useEffect(() => {
     if (!selectedId) return
-    db.getResults(selectedId).then(results => { if (results) loadCharts(selectedId) }).catch(() => {})
+    db.getResults(selectedId).then(r => {
+      if (r) loadCharts(selectedId)
+      else { setCharts({}); setResults(null) }
+    }).catch(() => {})
   }, [selectedId])
 
   const handleAnalyze = async () => {
@@ -51,6 +66,31 @@ export default function Analysis() {
   const handleCompare = async () => {
     if (compareIds.length < 2) return
     setCompareData(await engine.compareDatasets(compareIds))
+    // Pull raw rows + Group label for the t-test panel
+    const all = []
+    for (const id of compareIds) {
+      const r = await db.getResults(id)
+      const ds = await db.getDataset(id)
+      if (!r) continue
+      const grp = ds?.group || ds?.genotype || ds?.name
+      r.analyzedData.forEach(row => all.push({ ...row, Group: grp }))
+    }
+    setCompareRows(all)
+  }
+
+  const exportCSV = (kind) => {
+    if (!results) return
+    const ds = datasets.find(d => d.id === selectedId)
+    const base = ds?.name || `dataset_${selectedId}`
+    if (kind === 'cells') {
+      downloadText(rowsToCSV(results.analyzedData), `${base}_cells.csv`)
+    } else if (kind === 'baseline') {
+      downloadText(rowsToCSV(baselineStatsToRows(results.stats?.baseline)), `${base}_baseline_stats.csv`)
+    } else if (kind === 'motility') {
+      downloadText(rowsToCSV(motilitySummaryToRows(results.stats?.motilitySummary)), `${base}_motility_summary.csv`)
+    } else if (kind === 'clusters') {
+      downloadText(rowsToCSV(clusterPropsToRows(results.clusterProps)), `${base}_cluster_proportions.csv`)
+    }
   }
 
   const currentDs = datasets.find(d => d.id === selectedId)
@@ -73,11 +113,23 @@ export default function Analysis() {
       {engine.progress && <ProgressBar status={engine.progress.status} message={engine.progress.message} />}
       {isDone && Object.keys(charts).length > 0 && (
         <div className="space-y-6">
+          <div className="bg-white rounded-xl border p-3 flex flex-wrap gap-2 items-center text-sm">
+            <span className="font-medium text-gray-600 mr-1">Export:</span>
+            <button className="px-3 py-1 border rounded hover:bg-gray-50" onClick={() => exportCSV('cells')}>Cells (full)</button>
+            <button className="px-3 py-1 border rounded hover:bg-gray-50" onClick={() => exportCSV('baseline')}>Per-mouse means</button>
+            <button className="px-3 py-1 border rounded hover:bg-gray-50" onClick={() => exportCSV('motility')}>WHO motility</button>
+            <button className="px-3 py-1 border rounded hover:bg-gray-50" onClick={() => exportCSV('clusters')}>Cluster proportions</button>
+          </div>
           <div className="grid grid-cols-2 gap-6">
             <TsneLandscape data={charts.tsne_landscape} />
             <ClusterProportions data={charts.cluster_proportions} />
           </div>
+          <div className="grid grid-cols-2 gap-6">
+            <MotilityBreakdown summary={results?.stats?.motilitySummary} />
+            <Heatmap clusterProps={results?.clusterProps} title="Cluster Proportion Heatmap" />
+          </div>
           <ParameterBoxPlots data={charts.parameter_box} />
+          <StatsSummaryTable baseline={results?.stats?.baseline} />
           <div className="bg-white rounded-xl border p-4">
             <h3 className="font-semibold text-sm mb-3">Cross-Genotype Comparison</h3>
             <div className="flex gap-3 items-center mb-4">
@@ -87,6 +139,11 @@ export default function Analysis() {
               <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm" disabled={compareIds.length < 2} onClick={handleCompare}>Compare</button>
             </div>
             {compareData && <GenotypeComparison data={compareData} />}
+            {compareRows.length > 0 && (
+              <div className="mt-4">
+                <GroupComparisonPanel rows={compareRows} />
+              </div>
+            )}
           </div>
         </div>
       )}

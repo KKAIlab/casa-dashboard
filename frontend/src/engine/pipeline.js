@@ -2,6 +2,7 @@ import { CONFIG } from './config.js'
 import { runTsne } from './tsne.js'
 import { kmeans, standardize } from './clustering.js'
 import { computeBaselineStats, computeClusterProportions } from './statistics.js'
+import { annotateMotility, computeMotilitySummary } from './motility.js'
 
 export function runAnalysisPipeline(motileData, onProgress) {
   if (!motileData || motileData.length === 0) {
@@ -52,7 +53,7 @@ export function runAnalysisPipeline(motileData, onProgress) {
   })
 
   // Merge back
-  const analyzedData = []
+  let analyzedData = []
   for (const row of motileData) {
     const vals = features.map(f => row[f])
     if (vals.some(v => v == null || isNaN(v))) continue
@@ -63,16 +64,21 @@ export function runAnalysisPipeline(motileData, onProgress) {
     }
   }
 
+  // Annotate WHO motility class + hyperactivation
+  analyzedData = annotateMotility(analyzedData)
+
   // Statistics
   if (onProgress) onProgress({ step: 4, message: 'Computing statistics...' })
   const baseline = computeBaselineStats(analyzedData, CONFIG.ALL_CASA_PARAMS)
   const clusterProportions = computeClusterProportions(analyzedData)
+  const motilitySummary = computeMotilitySummary(analyzedData)
 
   return {
     analyzedData,
     stats: {
       baseline,
       clusterProportions,
+      motilitySummary,
       totalAnalyzed: analyzedData.length,
     },
   }
