@@ -216,10 +216,24 @@ export function runTsne(features, onProgress) {
   const n = features.length
 
   const candidates = CONFIG.TSNE_PERPLEXITIES.filter(p => p < n)
-  const perplexities = candidates.length > 0 ? candidates : [Math.max(1, Math.floor((n - 1) / 2))]
+  let perplexities = candidates.length > 0 ? candidates : [Math.max(1, Math.floor((n - 1) / 2))]
 
-  // For speed in tests and production, limit iterations based on dataset size
-  const maxIter = Math.min(CONFIG.TSNE_MAX_ITER, n > 100 ? 1000 : 300)
+  // t-SNE is O(n²) per iteration × perplexity-sweep × maxIter. For large n,
+  // trying every perplexity freezes the main thread for minutes. Keep the
+  // full sweep only for small n; for big embeddings pick two reasonable
+  // perplexities (≈5%–10% of n, clamped) so a co-embedding of ~800 cells
+  // finishes in a few seconds.
+  if (n > 300) {
+    const pick1 = Math.max(10, Math.min(30, Math.floor(n * 0.05)))
+    const pick2 = Math.max(pick1 + 10, Math.min(60, Math.floor(n * 0.1)))
+    perplexities = [pick1, pick2].filter(p => p < n)
+    if (perplexities.length === 0) perplexities = [Math.floor((n - 1) / 2)]
+  }
+
+  // For speed in tests and production, limit iterations based on dataset size.
+  // Large co-embeddings also cap harder so we don't freeze the UI.
+  const iterCap = n > 500 ? 500 : n > 100 ? 1000 : 300
+  const maxIter = Math.min(CONFIG.TSNE_MAX_ITER, iterCap)
 
   let bestEmbedding = null
   let bestKL = Infinity

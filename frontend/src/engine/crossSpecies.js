@@ -127,21 +127,40 @@ export function summarizeScoresByMouse(rows, scores) {
 // opts.standardizePerSource: if true, z-score each source independently before
 //          embedding. Recommended when species absolute scales differ
 //          (mouse VCL ~200 vs human VCL ~90 µm/s).
+// opts.maxPerSource: per-source cap. Each source is uniformly subsampled to
+//          at most this many cells before embedding. Default 250. t-SNE is
+//          O(n²) per iter so ~800 cells total keeps the run under ~10s and
+//          avoids freezing the main thread.
 //
-// Returns: { embedding, labels, sources, indices }
-//   embedding: (n × 2) t-SNE coordinates over the union
-//   labels:    parallel array of source labels for coloring
-//   sources:   the input source labels (for legend ordering)
-//   indices:   per-source [start, end) ranges into the embedding
+// Returns: { embedding, labels, sources, indices, subsampled }
+//   embedding:  (n × 2) t-SNE coordinates over the union
+//   labels:     parallel array of source labels for coloring
+//   sources:    the input source labels (for legend ordering)
+//   indices:    per-source [start, end) ranges into the embedding
+//   subsampled: { [label]: { sampled, total } } so UI can tell the user
 export function coEmbed(sources, params, opts = {}) {
   const standardizePerSource = opts.standardizePerSource !== false
+  const maxPerSource = opts.maxPerSource || 250
   const allFeatures = []
   const labels = []
   const indices = {}
+  const subsampled = {}
+
+  // Deterministic uniform subsample (keeps the first, last, and evenly
+  // spaced intermediates — avoids bias from any row ordering).
+  const pick = (n, k) => {
+    if (n <= k) return Array.from({ length: n }, (_, i) => i)
+    const out = new Array(k)
+    for (let i = 0; i < k; i++) out[i] = Math.floor((i * n) / k)
+    return out
+  }
 
   for (const { rows, label } of sources) {
     const start = allFeatures.length
-    let mat = rows.map(r => params.map(p => Number(r[p]) || 0))
+    const idxs = pick(rows.length, maxPerSource)
+    const chosen = idxs.map(i => rows[i])
+    subsampled[label] = { sampled: chosen.length, total: rows.length }
+    let mat = chosen.map(r => params.map(p => Number(r[p]) || 0))
 
     if (standardizePerSource && mat.length > 1) {
       const d = params.length
@@ -164,5 +183,5 @@ export function coEmbed(sources, params, opts = {}) {
   }
 
   const embedding = runTsne(allFeatures)
-  return { embedding, labels, sources: sources.map(s => s.label), indices }
+  return { embedding, labels, sources: sources.map(s => s.label), indices, subsampled }
 }
