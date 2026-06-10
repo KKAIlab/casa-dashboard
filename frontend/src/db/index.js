@@ -30,6 +30,27 @@ export async function closeDB() {
   }
 }
 
+// Probe whether persistent storage is usable. IndexedDB can be missing or
+// blocked (private browsing in some browsers, disabled site data, strict
+// privacy settings), in which case the whole app silently fails to load or
+// save datasets. Returns { ok, error } so the UI can warn instead of looking
+// inexplicably empty.
+export async function checkStorage() {
+  if (typeof indexedDB === 'undefined') {
+    return { ok: false, error: 'This browser does not support IndexedDB.' }
+  }
+  try {
+    const db = await getDB()
+    await db.count('datasets')
+    return { ok: true, error: null }
+  } catch (err) {
+    return {
+      ok: false,
+      error: err?.message || 'IndexedDB is unavailable (it may be blocked by private browsing or privacy settings).',
+    }
+  }
+}
+
 export async function addDataset({ name, genotype, mouseId, group, totalSperm, motileSperm, raw }) {
   const db = await getDB()
   return db.add('datasets', {

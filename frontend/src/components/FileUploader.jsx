@@ -3,12 +3,18 @@ import { useState, useRef } from 'react'
 export default function FileUploader({ onUpload, mode = 'raw' }) {
   const [dragging, setDragging] = useState(false)
   const [metadata, setMetadata] = useState({ name: '', genotype: '', mouseId: '', group: '' })
+  const [fileError, setFileError] = useState('')
   const fileRef = useRef()
 
   const handleDrop = (e) => { e.preventDefault(); setDragging(false); const file = e.dataTransfer.files[0]; if (file) submitFile(file) }
   const submitFile = (file) => {
+    if (!/\.csv$/i.test(file.name)) {
+      setFileError(`"${file.name}" is not a .csv file. Please upload a CSV exported from your CASA software.`)
+      return
+    }
+    setFileError('')
     onUpload(file, {
-      name: metadata.name || file.name.replace('.csv', ''),
+      name: metadata.name || file.name.replace(/\.csv$/i, ''),
       genotype: metadata.genotype,
       mouseId: metadata.mouseId,
       group: metadata.group || metadata.genotype,
@@ -35,6 +41,7 @@ export default function FileUploader({ onUpload, mode = 'raw' }) {
         <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={e => e.target.files[0] && submitFile(e.target.files[0])} />
         <p className="text-gray-500">{mode === 'raw' ? 'Drop raw CASA CSV here (Shift-JIS or UTF-8)' : 'Drop pre-processed CSV here (with t-SNE + Cluster columns)'}</p>
       </div>
+      {fileError && <p className="text-sm text-red-600" role="alert">{fileError}</p>}
     </div>
   )
 }

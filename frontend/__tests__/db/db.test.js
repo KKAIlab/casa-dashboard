@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import 'fake-indexeddb/auto'
-import { addDataset, getDatasets, getDataset, deleteDataset, saveResults, getResults, closeDB } from '../../src/db/index.js'
+import { addDataset, getDatasets, getDataset, deleteDataset, saveResults, getResults, closeDB, checkStorage } from '../../src/db/index.js'
 
 beforeEach(async () => {
   await closeDB()
@@ -41,6 +41,27 @@ describe('datasets CRUD', () => {
     await deleteDataset(id)
     const all = await getDatasets()
     expect(all).toHaveLength(0)
+  })
+})
+
+describe('checkStorage', () => {
+  it('reports ok when IndexedDB works', async () => {
+    const { ok, error } = await checkStorage()
+    expect(ok).toBe(true)
+    expect(error).toBeNull()
+  })
+
+  it('reports not-ok when IndexedDB is missing', async () => {
+    const original = globalThis.indexedDB
+    // Simulate a browser without IndexedDB (e.g. blocked by privacy settings).
+    delete globalThis.indexedDB
+    try {
+      const { ok, error } = await checkStorage()
+      expect(ok).toBe(false)
+      expect(error).toBeTruthy()
+    } finally {
+      globalThis.indexedDB = original
+    }
   })
 })
 

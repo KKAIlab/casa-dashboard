@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { checkStorage } from '../db/index.js'
+import Banner from './Banner'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: '◉' },
@@ -9,6 +12,14 @@ const NAV_ITEMS = [
 ]
 
 export default function Layout() {
+  const [storageError, setStorageError] = useState(null)
+
+  useEffect(() => {
+    let active = true
+    checkStorage().then(({ ok, error }) => { if (active && !ok) setStorageError(error) })
+    return () => { active = false }
+  }, [])
+
   return (
     <div className="flex h-screen bg-gray-50">
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
@@ -38,7 +49,13 @@ export default function Layout() {
           CASA Dashboard v2.0
         </div>
       </aside>
-      <main className="flex-1 overflow-auto p-6">
+      <main className="flex-1 overflow-auto p-6 space-y-6">
+        {storageError && (
+          <Banner variant="error" title="Local storage unavailable">
+            {storageError} Your datasets cannot be saved or loaded. Try a normal
+            (non-private) window and allow site data for this page.
+          </Banner>
+        )}
         <Outlet />
       </main>
     </div>
