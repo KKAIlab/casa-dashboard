@@ -54,7 +54,7 @@ function StartupLoader() {
     }
     run()
     return () => { cancelled = true }
-  }, [])
+  }, [db, engine])
   return null
 }
 

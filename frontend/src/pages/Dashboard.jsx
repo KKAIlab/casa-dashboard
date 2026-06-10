@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDB } from '../hooks/useDB'
-import { useAppState } from '../context/AppContext'
+import { useAppState } from '../context/appContext'
 
 export default function Dashboard() {
   const db = useDB()
@@ -14,7 +14,7 @@ export default function Dashboard() {
       dispatch({ type: 'SET_DATASETS', payload: data })
       setLoading(false)
     }).catch(() => setLoading(false))
-  }, [])
+  }, [db, dispatch])
 
   const datasets = state.datasets
   const stats = {

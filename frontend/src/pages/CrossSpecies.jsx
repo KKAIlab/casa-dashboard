@@ -37,7 +37,7 @@ export default function CrossSpecies() {
 
   useEffect(() => {
     db.getDatasets().then(setDatasets).catch(() => {})
-  }, [])
+  }, [db])
 
   const handleTrain = async () => {
     setError(''); setAxis(null); setProjection(null)

@@ -1,6 +1,5 @@
-import { createContext, useContext, useReducer } from 'react'
-
-const AppContext = createContext()
+import { useReducer } from 'react'
+import { AppContext } from './appContext.js'
 
 const initialState = {
   datasets: [],
@@ -34,8 +33,4 @@ export function AppProvider({ children }) {
       {children}
     </AppContext.Provider>
   )
-}
-
-export function useAppState() {
-  return useContext(AppContext)
 }

@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useDB } from '../hooks/useDB'
 import { useEngine } from '../hooks/useEngine'
-import { useAppState } from '../context/AppContext'
+import { useAppState } from '../context/appContext'
 import FileUploader from '../components/FileUploader'
 import DataTable from '../components/DataTable'
 import ReferenceLoader from '../components/ReferenceLoader'
@@ -13,8 +13,10 @@ export default function DataManagement() {
   const [uploadMode, setUploadMode] = useState('raw')
   const [message, setMessage] = useState('')
 
-  const refresh = () => { db.getDatasets().then(data => dispatch({ type: 'SET_DATASETS', payload: data })) }
-  useEffect(() => { refresh() }, [])
+  const refresh = useCallback(() => {
+    db.getDatasets().then(data => dispatch({ type: 'SET_DATASETS', payload: data }))
+  }, [db, dispatch])
+  useEffect(() => { refresh() }, [refresh])
 
   const handleUpload = async (file, meta, mode) => {
     try {

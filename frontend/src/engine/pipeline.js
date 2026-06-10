@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js'
 import { runTsne } from './tsne.js'
-import { kmeans, standardize } from './clustering.js'
+import { kmeans } from './clustering.js'
 import { computeBaselineStats, computeClusterProportions } from './statistics.js'
 import { annotateMotility, computeMotilitySummary } from './motility.js'
 

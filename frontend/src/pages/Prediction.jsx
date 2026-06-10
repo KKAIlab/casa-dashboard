@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useDB } from '../hooks/useDB'
 import { useEngine } from '../hooks/useEngine'
-import { useAppState } from '../context/AppContext'
+import { useAppState } from '../context/appContext'
 import { readFileText, parseCSVText } from '../engine/preprocessing'
 import ClusterClassifier from '../components/prediction/ClusterClassifier'
 import DensityScoring from '../components/prediction/DensityScoring'
@@ -24,7 +24,7 @@ export default function Prediction() {
       setDatasets(data.filter(d => d.status === 'done'))
       dispatch({ type: 'SET_DATASETS', payload: data })
     }).catch(() => {})
-  }, [])
+  }, [db, dispatch])
 
   const runPrediction = async (modelType) => {
     if (!selectedId) return

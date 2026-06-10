@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import * as db from '../db/index.js'
 
 export function useDB() {
@@ -14,5 +14,10 @@ export function useDB() {
   const saveResults = useCallback((datasetId, results) => db.saveResults(datasetId, results), [])
   const updateDataset = useCallback((id, updates) => db.updateDataset(id, updates), [])
 
-  return { getDatasets, getDataset, deleteDataset, getResults, uploadDataset, saveResults, updateDataset }
+  // Memoize so the returned object keeps a stable identity across renders;
+  // components can safely list `db` in effect/callback dependency arrays.
+  return useMemo(
+    () => ({ getDatasets, getDataset, deleteDataset, getResults, uploadDataset, saveResults, updateDataset }),
+    [getDatasets, getDataset, deleteDataset, getResults, uploadDataset, saveResults, updateDataset],
+  )
 }

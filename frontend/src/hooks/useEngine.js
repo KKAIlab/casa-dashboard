@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { preprocessCSV, readFileText, parseCSVText } from '../engine/preprocessing.js'
 import { runAnalysisPipeline } from '../engine/pipeline.js'
 import { classifyByProportions, computeDensityScore } from '../engine/prediction.js'
@@ -11,7 +11,7 @@ export function useEngine() {
 
   const uploadAndPreprocess = useCallback(async (file, meta) => {
     const text = await readFileText(file)
-    const { data, totalSperm, motileSperm, error } = preprocessCSV(text, meta)
+    const { totalSperm, motileSperm, error } = preprocessCSV(text, meta)
     if (error) throw new Error(error)
     return db.uploadDataset({
       name: meta.name || file.name.replace('.csv', ''),
@@ -85,7 +85,7 @@ export function useEngine() {
       setProgress({ status: 'error', message: error })
       throw new Error(error)
     }
-    const result = runAnalysisPipeline(data, ({ step, message }) => {
+    const result = runAnalysisPipeline(data, ({ message }) => {
       setProgress({ status: 'running', message })
     })
     if (result.error) {
@@ -206,9 +206,16 @@ export function useEngine() {
     return coEmbed(sources, params, opts)
   }, [loadCellRows])
 
-  return {
-    uploadAndPreprocess, importProcessed, importFromURL, analyze,
-    getChartData, compareDatasets, predict, progress,
-    trainAxis, projectDatasets, runCoEmbed,
-  }
+  return useMemo(
+    () => ({
+      uploadAndPreprocess, importProcessed, importFromURL, analyze,
+      getChartData, compareDatasets, predict, progress,
+      trainAxis, projectDatasets, runCoEmbed,
+    }),
+    [
+      uploadAndPreprocess, importProcessed, importFromURL, analyze,
+      getChartData, compareDatasets, predict, progress,
+      trainAxis, projectDatasets, runCoEmbed,
+    ],
+  )
 }

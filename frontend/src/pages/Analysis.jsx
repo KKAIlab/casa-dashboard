@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useDB } from '../hooks/useDB'
 import { useEngine } from '../hooks/useEngine'
-import { useAppState } from '../context/AppContext'
+import { useAppState } from '../context/appContext'
 import ProgressBar from '../components/ProgressBar'
 import TsneLandscape from '../components/charts/TsneLandscape'
 import ClusterProportions from '../components/charts/ClusterProportions'
@@ -32,7 +32,7 @@ export default function Analysis() {
 
   useEffect(() => {
     db.getDatasets().then(data => { setDatasets(data); dispatch({ type: 'SET_DATASETS', payload: data }) }).catch(() => {})
-  }, [])
+  }, [db, dispatch])
 
   const loadCharts = useCallback(async (id) => {
     const types = ['tsne_landscape', 'cluster_proportions', 'parameter_box']
@@ -49,7 +49,7 @@ export default function Analysis() {
       if (r) loadCharts(selectedId)
       else { setCharts({}); setResults(null) }
     }).catch(() => {})
-  }, [selectedId])
+  }, [selectedId, db, loadCharts])
 
   const handleAnalyze = async () => {
     if (!selectedId) return
