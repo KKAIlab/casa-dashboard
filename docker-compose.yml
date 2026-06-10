@@ -1,19 +1,8 @@
+# The dashboard is a pure client-side static site (no backend).
+# This compose file is only for self-hosting the built frontend; the
+# public deployment is served from GitHub Pages.
 services:
-  backend:
-    build: ./backend
-    ports:
-      - "8000:8000"
-    volumes:
-      - casa-data:/app/data
-    environment:
-      - PYTHONPATH=/app
-
   frontend:
     build: ./frontend
     ports:
       - "3000:3000"
-    depends_on:
-      - backend
-
-volumes:
-  casa-data:
