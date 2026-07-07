@@ -41,6 +41,8 @@ export function comparisonToRows(comparison, groupA, groupB) {
     t_statistic: c.tStat,
     df: c.df,
     p_value: c.pValue,
-    significant: c.pValue < 0.05 ? 'yes' : 'no',
+    p_value_bh_adjusted: c.pAdjusted,
+    // Prefer the FDR-adjusted p-value; fall back to the raw p if unadjusted.
+    significant: (c.pAdjusted ?? c.pValue) < 0.05 ? 'yes' : 'no',
   }))
 }

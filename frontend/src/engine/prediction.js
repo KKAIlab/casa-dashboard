@@ -44,10 +44,15 @@ export function classifyByProportions(sampleProportions, reference) {
 
 export function computeDensityScore(sampleEmbedding, referenceEmbedding, bins = 20) {
   const all = [...sampleEmbedding, ...referenceEmbedding]
-  const xMin = Math.min(...all.map(p => p[0]))
-  const xMax = Math.max(...all.map(p => p[0]))
-  const yMin = Math.min(...all.map(p => p[1]))
-  const yMax = Math.max(...all.map(p => p[1]))
+  // reduce instead of Math.min(...spread): a large embedding can exceed the
+  // argument-count limit and throw with a spread.
+  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity
+  for (const [x, y] of all) {
+    if (x < xMin) xMin = x
+    if (x > xMax) xMax = x
+    if (y < yMin) yMin = y
+    if (y > yMax) yMax = y
+  }
   const xRange = xMax - xMin || 1
   const yRange = yMax - yMin || 1
 
@@ -78,8 +83,12 @@ export function computeDensityScore(sampleEmbedding, referenceEmbedding, bins = 
     return sum
   }
 
+  // JS divergence in nats is bounded to [0, ln 2]. Normalize by ln 2 so the
+  // similarity score spans the full 0..100 range: identical distributions → 100,
+  // fully disjoint → 0. (Without this, disjoint distributions floor at ~31.)
   const jsDivergence = (kl(P, M) + kl(Q, M)) / 2
-  const similarityScore = Math.max(0, Math.min(100, (1 - jsDivergence) * 100))
+  const normalized = jsDivergence / Math.LN2
+  const similarityScore = Math.max(0, Math.min(100, (1 - normalized) * 100))
 
   return { similarityScore, jsDivergence }
 }

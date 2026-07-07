@@ -11,7 +11,7 @@ export function useEngine() {
 
   const uploadAndPreprocess = useCallback(async (file, meta) => {
     const text = await readFileText(file)
-    const { data, totalSperm, motileSperm, error } = preprocessCSV(text, meta)
+    const { totalSperm, motileSperm, error } = preprocessCSV(text, meta)
     if (error) throw new Error(error)
     return db.uploadDataset({
       name: meta.name || file.name.replace('.csv', ''),
@@ -54,7 +54,7 @@ export function useEngine() {
     const id = await db.uploadDataset({
       name: meta.name || file.name.replace('.csv', ''),
       genotype: meta.genotype, mouseId: meta.mouseId || data[0].Mouse,
-      group: meta.genotype, csvText: text, totalSperm: data.length, motileSperm: data.length,
+      group: meta.group || meta.genotype, csvText: text, totalSperm: data.length, motileSperm: data.length,
     })
     if (hasTsne) {
       const { computeBaselineStats, computeClusterProportions } = await import('../engine/statistics.js')
@@ -85,7 +85,7 @@ export function useEngine() {
       setProgress({ status: 'error', message: error })
       throw new Error(error)
     }
-    const result = runAnalysisPipeline(data, ({ step, message }) => {
+    const result = runAnalysisPipeline(data, ({ message }) => {
       setProgress({ status: 'running', message })
     })
     if (result.error) {

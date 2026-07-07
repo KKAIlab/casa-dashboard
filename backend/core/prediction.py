@@ -53,8 +53,11 @@ def landscape_density_score(sample_coords: np.ndarray, reference_coords: np.ndar
     density_ref = kde_ref(grid_points)
     density_ref = density_ref / density_ref.sum()
 
+    # scipy's jensenshannon returns the JS *distance* (sqrt of divergence) in
+    # nats; squaring gives the divergence in [0, ln 2]. Normalize by ln 2 so the
+    # similarity spans the full 0..100 range (disjoint -> 0, not a ~31 floor).
     js_div = float(jensenshannon(density_sample, density_ref) ** 2)
-    similarity = (1.0 - js_div) * 100.0
+    similarity = (1.0 - js_div / np.log(2)) * 100.0
 
     return {
         "similarity_score": float(max(0.0, min(100.0, similarity))),

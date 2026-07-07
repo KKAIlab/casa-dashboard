@@ -36,6 +36,8 @@ export function AppProvider({ children }) {
   )
 }
 
+// Colocated with the provider by design; this only affects dev-time fast refresh.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAppState() {
   return useContext(AppContext)
 }

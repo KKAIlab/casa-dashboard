@@ -89,11 +89,9 @@ function computeP(X, perplexity) {
   }
 
   // Symmetrize: P_ij = (P_i|j + P_j|i) / (2n)
-  let sum = 0
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
       P[i][j] = (P[i][j] + P[j][i]) / (2 * n)
-      sum += P[i][j]
     }
   }
 

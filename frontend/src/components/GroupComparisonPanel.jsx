@@ -81,6 +81,7 @@ export default function GroupComparisonPanel({ rows, defaultParams = PARAMS }) {
                 <th className="py-2 px-2">{groupB} (n={result[defaultParams[0]]?.nB ?? 0})</th>
                 <th className="py-2 px-2">t</th>
                 <th className="py-2 px-2">p-value</th>
+                <th className="py-2 px-2">p (BH-adj.)</th>
               </tr>
             </thead>
             <tbody>
@@ -92,14 +93,16 @@ export default function GroupComparisonPanel({ rows, defaultParams = PARAMS }) {
                     <td className="py-1.5 px-2 font-mono">{fmt(r.meanA)}</td>
                     <td className="py-1.5 px-2 font-mono">{fmt(r.meanB)}</td>
                     <td className="py-1.5 px-2 font-mono text-gray-600">{fmt(r.tStat)}</td>
-                    <td className={`py-1.5 px-2 font-mono ${pColor(r.pValue)}`}>{fmtP(r.pValue)}</td>
+                    <td className="py-1.5 px-2 font-mono text-gray-500">{fmtP(r.pValue)}</td>
+                    <td className={`py-1.5 px-2 font-mono ${pColor(r.pAdjusted)}`}>{fmtP(r.pAdjusted)}</td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
           <p className="text-xs text-gray-400 mt-2">
-            Bold red: p &lt; 0.001 · red: p &lt; 0.01 · orange: p &lt; 0.05. Cell-level test, not pseudoreplication-corrected.
+            Colouring uses the Benjamini-Hochberg FDR-adjusted p-value across {defaultParams.length} parameters
+            (bold red &lt; 0.001 · red &lt; 0.01 · orange &lt; 0.05). Cell-level test, not pseudoreplication-corrected.
           </p>
         </div>
       )}

@@ -31,4 +31,19 @@ describe('computeDensityScore', () => {
     const score = computeDensityScore(sample, reference)
     expect(score.similarityScore).toBeLessThan(50)
   })
+
+  it('scores fully-disjoint distributions near 0 (normalized JSD)', () => {
+    // Two histograms with no overlapping bins → JSD = ln 2. After normalizing
+    // by ln 2 the similarity score must approach 0, not floor at ~31.
+    const sample = [[0, 0], [0, 0], [0, 0], [0, 0]]
+    const reference = [[1000, 1000], [1000, 1000], [1000, 1000], [1000, 1000]]
+    const score = computeDensityScore(sample, reference)
+    expect(score.similarityScore).toBeLessThan(1)
+  })
+
+  it('scores identical distributions at 100', () => {
+    const pts = [[0, 0], [1, 1], [2, 2], [3, 3]]
+    const score = computeDensityScore(pts, pts)
+    expect(score.similarityScore).toBeGreaterThan(99.9)
+  })
 })

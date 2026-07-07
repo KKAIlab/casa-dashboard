@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeBaselineStats, computeClusterProportions, welchTTest } from '../../src/engine/statistics.js'
+import { computeBaselineStats, computeClusterProportions, welchTTest, adjustPValuesBH, compareGroups } from '../../src/engine/statistics.js'
 
 describe('computeBaselineStats', () => {
   it('computes mean and std per mouse', () => {
@@ -46,5 +46,42 @@ describe('welchTTest', () => {
     const b = [100, 103, 97, 101, 100]
     const result = welchTTest(a, b)
     expect(result.pValue).toBeGreaterThan(0.3)
+  })
+})
+
+describe('adjustPValuesBH', () => {
+  it('matches R p.adjust(method="BH") on a known vector', () => {
+    // p.adjust(c(0.01, 0.02, 0.03, 0.04, 0.05), "BH") =
+    //   0.05 0.05 0.05 0.05 0.05
+    const adj = adjustPValuesBH([0.01, 0.02, 0.03, 0.04, 0.05])
+    for (const q of adj) expect(q).toBeCloseTo(0.05, 10)
+  })
+
+  it('enforces monotonicity and caps at 1', () => {
+    // p.adjust(c(0.001, 0.5, 0.9), "BH") = 0.003 0.75 0.9
+    const adj = adjustPValuesBH([0.001, 0.5, 0.9])
+    expect(adj[0]).toBeCloseTo(0.003, 10)
+    expect(adj[1]).toBeCloseTo(0.75, 10)
+    expect(adj[2]).toBeCloseTo(0.9, 10)
+  })
+
+  it('passes NaN p-values through and excludes them from m', () => {
+    const adj = adjustPValuesBH([0.01, NaN, 0.02])
+    // m = 2 valid tests: 0.01*2/1=0.02, 0.02*2/2=0.02 → both 0.02
+    expect(adj[0]).toBeCloseTo(0.02, 10)
+    expect(Number.isNaN(adj[1])).toBe(true)
+    expect(adj[2]).toBeCloseTo(0.02, 10)
+  })
+})
+
+describe('compareGroups adds BH-adjusted p-values', () => {
+  it('attaches pAdjusted >= pValue for each parameter', () => {
+    const rows = [
+      ...Array.from({ length: 8 }, (_, i) => ({ Group: 'WT', VCL: 100 + i, VSL: 70 + i })),
+      ...Array.from({ length: 8 }, (_, i) => ({ Group: 'KO', VCL: 60 + i, VSL: 40 + i })),
+    ]
+    const out = compareGroups(rows, 'WT', 'KO', ['VCL', 'VSL'])
+    expect(out.VCL.pAdjusted).toBeGreaterThanOrEqual(out.VCL.pValue)
+    expect(out.VSL.pAdjusted).toBeGreaterThanOrEqual(out.VSL.pValue)
   })
 })
