@@ -377,10 +377,11 @@ the file header for full schema mapping notes.
 For users who don't have real human data on hand, the dashboard ships two
 reference CSVs in [`frontend/public/references/`](frontend/public/references):
 
-- `who_human_fertile.csv` — 3 donors, 465 cells, drawn from WHO 5th-ed. normative
-  ranges (PR≈55%, hyperactivated≈10%, VCL≈95±18 µm/s).
-- `who_human_subfertile.csv` — 3 donors, 445 cells, asthenozoospermia profile
-  (PR≈22%, hyperactivated≈3%, VCL≈55±18 µm/s).
+- `who_human_fertile.csv` — 3 donors, 465 cells, a normospermic profile. Measured
+  on the shipped data: PR≈53%, IM≈25%, hyperactivated≈6.5%, VCL≈66±56 µm/s
+  (a heterogeneous motile+immotile mixture, not a tight Gaussian).
+- `who_human_subfertile.csv` — 3 donors, 445 cells, asthenozoospermia profile.
+  Measured: PR≈22%, IM≈49%, hyperactivated≈1.6%, VCL≈23±31 µm/s.
 
 Both load via the **Built-in Human References** card on Data Management. They
 are derived from published distributions (WHO 2010, Mortimer 1990, Holt 1985)

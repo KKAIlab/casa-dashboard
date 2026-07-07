@@ -7,7 +7,7 @@
       "group": "fertile",
       "donors": 3,
       "cells": 465,
-      "description": "Synthetic cell-level CSV with WHO 5th-edition normative human distributions. PR≈55%, hyperactivated≈10%, VCL≈95±18 µm/s. Built from published reference ranges (WHO 2010, Mortimer 1990, Holt 1985); not real-patient data."
+      "description": "Synthetic cell-level CSV approximating a WHO 5th-edition normospermic profile. Measured on the shipped data: PR≈53%, NP≈22%, IM≈25%, hyperactivated≈6.5%, VCL≈66±56 µm/s (a heterogeneous motile+immotile mixture, not a tight Gaussian). Built from published reference ranges (WHO 2010, Mortimer 1990, Holt 1985); not real-patient data."
     },
     {
       "id": "who_human_subfertile",
@@ -16,7 +16,7 @@
       "group": "subfertile",
       "donors": 3,
       "cells": 445,
-      "description": "Synthetic cell-level CSV mimicking sub-WHO motility profiles. PR≈22%, hyperactivated≈3%, VCL≈55±18 µm/s. Useful as a contrastive reference for the Prediction page."
+      "description": "Synthetic cell-level CSV approximating a sub-WHO (asthenozoospermia) profile. Measured on the shipped data: PR≈22%, NP≈28%, IM≈49%, hyperactivated≈1.6%, VCL≈23±31 µm/s. Useful as a contrastive reference for the Prediction page; not real-patient data."
     }
   ]
 }
