@@ -209,4 +209,18 @@ for (const pid of participantDirs) {
 if (!opts.dryRun) {
   fs.writeFileSync(path.join(outDir, 'visem_index.json'), JSON.stringify(manifest, null, 2))
 }
+
+// Report how many participants actually matched a PR% record. A low match rate
+// almost always means the videos/<id> directory names and the IDs in
+// semen_analysis_data.csv use different formats (zero-padding, prefixes), which
+// would otherwise silently label every participant "unknown".
+const matched = manifest.filter(m => m.group !== 'unknown').length
+if (Object.keys(participantPR).length > 0) {
+  console.log(`group labels: matched PR%% for ${matched}/${manifest.length} participants`)
+  if (matched < manifest.length) {
+    const misses = manifest.filter(m => m.group === 'unknown').map(m => m.participant)
+    console.warn(`warning: ${manifest.length - matched} participant(s) had no PR% match and were labelled "unknown": ${misses.slice(0, 10).join(', ')}${misses.length > 10 ? ' …' : ''}`)
+    console.warn('  check that videos/<id> directory names match the ID column in semen_analysis_data.csv.')
+  }
+}
 console.log(`done. ${manifest.length} CSVs ${opts.dryRun ? 'would be' : ''} written to ${outDir}`)

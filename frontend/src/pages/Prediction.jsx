@@ -33,11 +33,26 @@ export default function Prediction() {
     try {
       const refText = await readFileText(refFile)
       const { rows } = parseCSVText(refText)
+      if (!rows.length) throw new Error('Reference CSV is empty or could not be parsed.')
       let referenceData
       if (modelType === 'cluster_classifier') {
-        referenceData = rows.map(r => ({ label: r.label, proportions: { 0: r[0] || 0, 1: r[1] || 0, 2: r[2] || 0, 3: r[3] || 0, 4: r[4] || 0 } }))
+        const header = Object.keys(rows[0])
+        if (!header.includes('label')) {
+          throw new Error("Reference CSV for Model A needs a 'label' column (e.g. fertile/subfertile).")
+        }
+        const clusterCols = header.filter(h => /^\d+$/.test(h))
+        if (clusterCols.length === 0) {
+          throw new Error("Reference CSV for Model A needs cluster-proportion columns named by cluster id (0, 1, 2, …).")
+        }
+        referenceData = rows.map(r => ({
+          label: r.label,
+          proportions: Object.fromEntries(clusterCols.map(c => [c, Number(r[c]) || 0])),
+        }))
       } else {
         referenceData = { tsne: rows.map(r => [r.tSNE1, r.tSNE2]).filter(r => !isNaN(r[0])) }
+        if (referenceData.tsne.length === 0) {
+          throw new Error('Reference CSV for Model B needs numeric tSNE1 and tSNE2 columns.')
+        }
       }
       const result = await engine.predict(selectedId, modelType, referenceData)
       if (modelType === 'cluster_classifier') { setClassifierResult(result.result) } else { setDensityResult(result.result) }
