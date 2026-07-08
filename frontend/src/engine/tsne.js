@@ -106,7 +106,7 @@ function computeP(X, perplexity) {
 }
 
 // Run t-SNE gradient descent and return { embedding, kl }
-function tsneRun(X, perplexity, seed, maxIter, learningRate = 200) {
+export function tsneRun(X, perplexity, seed, maxIter, learningRate = 200) {
   const n = X.length
   const rng = mulberry32(seed)
 
