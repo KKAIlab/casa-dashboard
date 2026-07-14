@@ -6,6 +6,10 @@ A browser-based interactive dashboard for Computer-Assisted Sperm Analysis (CASA
 
 **[Open Dashboard](https://kkailab.github.io/casa-dashboard/)**
 
+![CASA Dashboard — t-SNE motility landscape with K-Means clusters and per-cluster proportions](docs/screenshots/hero-analysis.png)
+
+<sub>The Analysis view: each dot is one sperm cell, positioned by its movement profile via t-SNE and colored by cluster. (Rendered from the built-in sample dataset — no real data required to try it.)</sub>
+
 ---
 
 ## What is this?
@@ -31,6 +35,9 @@ This tool takes CASA (Computer-Assisted Sperm Analysis) data and creates an inte
 Go to **[https://kkailab.github.io/casa-dashboard/](https://kkailab.github.io/casa-dashboard/)**
 
 You'll see a sidebar with 5 pages:
+
+![Dashboard overview showing dataset counts, total sperm cells, genotypes, and recent datasets](docs/screenshots/dashboard.png)
+
 - **Dashboard** — overview of your uploaded datasets
 - **Data Management** — upload and manage CSV files
 - **Analysis** — run t-SNE and view results
