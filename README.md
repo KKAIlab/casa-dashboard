@@ -114,9 +114,22 @@ The dashboard accepts CSV files directly exported from CASA software. Japanese c
 | 頭部振幅[um] | ALH | Lateral head displacement |
 | 頭部振動数[Hz] | BCF | Beat cross frequency |
 
-- Both **Shift-JIS** and **UTF-8** encodings are supported
+- Both **Shift-JIS** and **UTF-8** encodings are supported (auto-detected)
 - Only motile sperm (**Type = 99**) are included in analysis
 - English column headers work too (if your CASA software exports in English)
+
+**Robust to real-world export quirks.** The importer auto-handles the
+variations that real CASA software produces, so you can drop files in as-is:
+
+- **Micro-sign variants** — `µm` (U+00B5), `μm` (Greek mu), and romanized `um`
+  all map correctly (this previously caused silent "no data" failures).
+- **Metadata/preamble rows** — sample name, date, and software-version lines
+  before the real column header are detected and skipped automatically.
+- **Full-width brackets/units** (`頭部振幅［µm］`) and **English headers with
+  units** (`VCL [µm/s]`) are recognized.
+- **Clear errors** — if a required column (VCL/VSL/ALH/BCF) is missing, or no
+  rows are motile, the upload reports exactly what's wrong instead of failing
+  silently.
 
 ### Pre-processed CSV (for import)
 
