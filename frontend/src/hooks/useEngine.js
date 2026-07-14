@@ -13,13 +13,14 @@ export function useEngine() {
     const text = await readFileText(file)
     const { data, totalSperm, motileSperm, error } = preprocessCSV(text, meta)
     if (error) throw new Error(error)
-    return db.uploadDataset({
+    const id = await db.uploadDataset({
       name: meta.name || file.name.replace('.csv', ''),
       genotype: meta.genotype,
       mouseId: meta.mouseId,
       group: meta.group || meta.genotype,
       csvText: text, totalSperm, motileSperm,
     })
+    return { id, totalSperm, motileSperm }
   }, [db])
 
   // Import a CSV fetched from a URL (used for built-in reference datasets).

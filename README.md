@@ -236,8 +236,9 @@ A: WHO 5th edition motility categories and Mortimer's hyperactivation criteria:
 These are computed automatically and shown in the WHO Motility Classification chart.
 
 **Q: I just want to try it without uploading anything.**
-A: Two options on the Data Management page:
-- **Download sample CSV** (top right) — synthetic WT vs KO mouse data with t-SNE pre-computed; re-upload via "Import Processed CSV".
+A: Options on the Data Management page:
+- **Sample raw CASA CSV** (top right) — a realistic *raw* export (Japanese headers, `µ` micro-sign units, a metadata preamble, mix of motile/immotile rows). Upload it via "Upload Raw CASA CSV" to exercise the full parse → t-SNE → cluster → WHO → export path. This is also the reference for the exact format the importer expects, so you can match your own files to it.
+- **Sample processed CSV** — synthetic WT vs KO mouse data with t-SNE pre-computed; re-upload via "Import Processed CSV".
 - **Built-in Human References** section — one-click load of synthetic human cell-level data drawn from WHO 5th-edition normative ranges (fertile and subfertile profiles). After loading, run analysis from the Analysis page.
 
 **Q: Is there real human CASA data I can use?**
